@@ -1,22 +1,13 @@
 mod search_providers;
-use crate::search_providers::Knaben;
-use crate::search_providers::PirateBay;
-use crate::search_providers::SearchProvider;
+use search_providers::{Magneto, Options};
 
 #[tokio::main]
 async fn main() {
-    let _ = PirateBay::new();
-    let knaben = Knaben::new();
+    let opts = Options::default();
+    let magneto = Magneto::new(opts);
 
-    match knaben.search("Interstellar").await {
-        Ok(t) => {
-            for entry in t {
-                println!("{} {}", entry.name, entry.magnet_link);
-            }
-        }
-        Err(err) => {
-            println!("err: {}", err);
-            return;
-        }
+    let results = magneto.search("Interstellar");
+    for result in results.await {
+        println!("name:{}, magnet:{}", result.name, result.magnet_link);
     }
 }
