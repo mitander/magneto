@@ -1,7 +1,11 @@
 use async_trait::async_trait;
 use std::error::Error;
 
+pub mod knaben;
 pub mod piratebay;
+
+pub use knaben::Knaben;
+pub use piratebay::PirateBay;
 
 pub struct Torrent {
     pub name: String,

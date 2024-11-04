@@ -1,12 +1,14 @@
-mod magneto;
-use crate::magneto::piratebay::PirateBay;
-use crate::magneto::SearchProvider;
+mod search_providers;
+use crate::search_providers::Knaben;
+use crate::search_providers::PirateBay;
+use crate::search_providers::SearchProvider;
 
 #[tokio::main]
 async fn main() {
-    let pb = PirateBay::new();
+    let _ = PirateBay::new();
+    let knaben = Knaben::new();
 
-    match pb.search("Interstellar").await {
+    match knaben.search("Interstellar").await {
         Ok(t) => {
             for entry in t {
                 println!("{} {}", entry.name, entry.magnet_link);

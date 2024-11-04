@@ -1,7 +1,7 @@
 use std::error::Error;
 
-use crate::magneto::SearchProvider;
-use crate::magneto::Torrent;
+use crate::search_providers::SearchProvider;
+use crate::search_providers::Torrent;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -16,7 +16,6 @@ use serde::Deserialize;
 const EMPTY_ID: &str = "0";
 const EMPTY_NAME: &str = "No results returned";
 const EMPTY_HASH: &str = "0000000000000000000000000000000000000000";
-
 const URL: &str = "https://apibay.org/q.php?q=";
 
 pub struct PirateBay {}
@@ -52,6 +51,7 @@ impl SearchProvider for PirateBay {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct Entry {
     pub id: String,
@@ -76,6 +76,7 @@ impl Entry {
 
 fn parse(content: &str) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
     let entries: Vec<Entry> = serde_json::from_str(content)?;
+    println!("{:?}", entries);
     let results = entries
         .iter()
         .filter(|entry| entry.filter())
