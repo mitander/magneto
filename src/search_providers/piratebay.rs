@@ -13,6 +13,8 @@ use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use serde::Deserialize;
 
+use super::SearchRequest;
+
 const EMPTY_ID: &str = "0";
 const EMPTY_NAME: &str = "No results returned";
 const EMPTY_HASH: &str = "0000000000000000000000000000000000000000";
@@ -28,11 +30,14 @@ impl PirateBay {
 
 #[async_trait]
 impl SearchProvider for PirateBay {
-    async fn search(&self, query: &str) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
+    async fn search(
+        &self,
+        req: SearchRequest,
+    ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
         let https = HttpsConnector::new();
         let client = Client::builder(TokioExecutor::new()).build::<_, Empty<Bytes>>(https);
 
-        let request = Request::get(URL.to_string() + query)
+        let request = Request::get(URL.to_string() + &req.query)
             .body(Empty::new())
             .expect("Request builder");
 

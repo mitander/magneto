@@ -12,7 +12,8 @@ use hyper_tls::HttpsConnector;
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use serde::Deserialize;
-use serde_json::json;
+
+use super::SearchRequest;
 
 const URL: &str = "https://api.knaben.eu/v1";
 
@@ -26,29 +27,21 @@ impl Knaben {
 
 #[async_trait]
 impl SearchProvider for Knaben {
-    async fn search(&self, query: &str) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
+    async fn search(
+        &self,
+        req: SearchRequest,
+    ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
         let https = HttpsConnector::new();
         let client = Client::builder(TokioExecutor::new()).build::<_, Full<Bytes>>(https);
 
-        let payload = json!({
-            "search_type": "100%",
-            "search_field": "title",
-            "query": query,
-            "order_by": "seeders",
-            "order_direction": "desc",
-            "categories": [3001000],
-            "from": 0,
-            "size": 10,
-            "hide_unsafe": true,
-            "hide_xxx": true
-        })
-        .to_string();
+        let json = req.to_json()?;
+        println!("{}", json);
 
         let request = Request::builder()
             .method(Method::POST)
             .uri(URL)
             .header("Content-Type", "application/json")
-            .body(Full::from(payload))?;
+            .body(Full::from(json))?;
 
         let mut response = client.request(request).await?;
         println!("status: {}", response.status());
