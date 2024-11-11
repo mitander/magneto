@@ -1,10 +1,9 @@
 mod search_providers;
-use search_providers::{Magneto, Options, SearchRequest};
+use search_providers::{Magneto, Options, Provider, SearchRequest};
 
 #[tokio::main]
 async fn main() {
-    let opts = Options::default();
-    let magneto = Magneto::new(opts);
+    let magneto = Magneto::new(Provider::Knaben, Options::default());
 
     let req = SearchRequest::new("Interstellar".to_string(), None);
     let results = magneto.search(req);

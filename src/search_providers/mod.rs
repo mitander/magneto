@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use knaben::Knaben;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
@@ -6,39 +7,41 @@ use std::fmt;
 pub mod knaben;
 pub mod piratebay;
 
-pub use knaben::Knaben;
-pub use piratebay::PirateBay;
-
 #[allow(dead_code)]
 #[derive(Default)]
 pub struct Options {
-    disable_knaben: bool,
     number_of_results: u16,
 }
 
 #[allow(dead_code)]
-#[derive(Default)]
+pub enum Provider {
+    Knaben,
+    Selection(Vec<Box<dyn SearchProvider>>),
+}
+
+#[allow(dead_code)]
 pub struct Magneto {
-    providers: Vec<Box<dyn SearchProvider>>,
+    provider: Provider,
     options: Options,
 }
 
 impl Magneto {
-    pub fn new(opts: Options) -> Self {
-        Magneto {
-            options: opts,
-            providers: vec![Box::new(Knaben::new()), Box::new(PirateBay::new())],
-        }
+    pub fn new(provider: Provider, options: Options) -> Self {
+        Magneto { options, provider }
     }
 
     pub async fn search(&self, req: SearchRequest) -> Vec<Torrent> {
-        let provider = if self.options.disable_knaben {
-            &self.providers[1]
-        } else {
-            &self.providers[0]
-        };
-
-        provider.search(req).await.unwrap()
+        match &self.provider {
+            Provider::Knaben => Knaben::new().search(req).await.unwrap(),
+            Provider::Selection(v) => {
+                let mut results = Vec::new();
+                for provider in v {
+                    let torrents = provider.search(req.clone()).await.unwrap();
+                    results.extend(torrents);
+                }
+                results
+            }
+        }
     }
 }
 
@@ -59,7 +62,7 @@ pub trait SearchProvider {
     ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>>;
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum SearchType {
     #[serde(rename = "score")]
     Score,
@@ -75,7 +78,7 @@ impl fmt::Display for SearchType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum OrderBy {
     #[serde(rename = "seeders")]
     Seeders,
@@ -94,7 +97,7 @@ impl fmt::Display for OrderBy {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum OrderDirection {
     #[serde(rename = "asc")]
     Asc,
@@ -102,7 +105,7 @@ enum OrderDirection {
     Desc,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SearchRequest {
     search_type: SearchType,
     search_field: Option<String>,
