@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use knaben::Knaben;
+use piratebay::PirateBay;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
@@ -14,9 +15,22 @@ pub struct Options {
 }
 
 #[allow(dead_code)]
+pub enum ProviderID {
+    PirateBay,
+}
+
+impl ProviderID {
+    fn create(&self) -> Box<dyn SearchProvider> {
+        match self {
+            ProviderID::PirateBay => Box::new(PirateBay::new()),
+        }
+    }
+}
+
+#[allow(dead_code)]
 pub enum Provider {
     Knaben,
-    Selection(Vec<Box<dyn SearchProvider>>),
+    Selection(Vec<ProviderID>),
 }
 
 #[allow(dead_code)]
@@ -30,14 +44,14 @@ impl Magneto {
         Magneto { options, provider }
     }
 
+    // TODO: handle errors, optional return?
     pub async fn search(&self, req: SearchRequest) -> Vec<Torrent> {
         match &self.provider {
             Provider::Knaben => Knaben::new().search(req).await.unwrap(),
-            Provider::Selection(v) => {
+            Provider::Selection(providers) => {
                 let mut results = Vec::new();
-                for provider in v {
-                    let torrents = provider.search(req.clone()).await.unwrap();
-                    results.extend(torrents);
+                for id in providers {
+                    results.extend(id.create().search(req.clone()).await.unwrap());
                 }
                 results
             }

@@ -62,7 +62,7 @@ pub struct Entry {
     pub id: String,
     pub name: String,
     pub info_hash: String,
-    pub peers: String,
+    pub leechers: String,
     pub seeders: String,
     pub num_files: String,
     pub size: String,
@@ -89,7 +89,7 @@ fn parse(content: &str) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
             name: entry.name.clone(),
             magnet_link: format!("magnet:?xt=urn:btih:{}", entry.info_hash),
             seeders: entry.seeders.parse().ok(),
-            leechers: entry.peers.parse().ok(),
+            leechers: entry.leechers.parse().ok(),
             size_bytes: entry.size.parse().ok(),
         })
         .collect();
