@@ -9,18 +9,12 @@ pub mod knaben;
 pub mod piratebay;
 
 #[allow(dead_code)]
-#[derive(Default)]
-pub struct Options {
-    number_of_results: u16,
-}
-
-#[allow(dead_code)]
 pub enum ProviderID {
     PirateBay,
 }
 
 impl ProviderID {
-    fn create(&self) -> Box<dyn SearchProvider> {
+    fn provider(&self) -> Box<dyn SearchProvider> {
         match self {
             ProviderID::PirateBay => Box::new(PirateBay::new()),
         }
@@ -30,30 +24,32 @@ impl ProviderID {
 #[allow(dead_code)]
 pub enum Provider {
     Knaben,
-    Selection(Vec<ProviderID>),
+    PirateBay,
+    Multiple(Vec<ProviderID>),
 }
 
-#[allow(dead_code)]
 pub struct Magneto {
     provider: Provider,
-    options: Options,
 }
 
 impl Magneto {
-    pub fn new(provider: Provider, options: Options) -> Self {
-        Magneto { options, provider }
+    pub fn new(provider: Provider) -> Self {
+        Magneto { provider }
     }
 
-    // TODO: handle errors, optional return?
-    pub async fn search(&self, req: SearchRequest) -> Vec<Torrent> {
+    pub async fn search(
+        &self,
+        req: SearchRequest<'_>,
+    ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
         match &self.provider {
-            Provider::Knaben => Knaben::new().search(req).await.unwrap(),
-            Provider::Selection(providers) => {
+            Provider::Knaben => Knaben::new().search(req).await,
+            Provider::PirateBay => PirateBay::new().search(req).await,
+            Provider::Multiple(providers) => {
                 let mut results = Vec::new();
                 for id in providers {
-                    results.extend(id.create().search(req.clone()).await.unwrap());
+                    results.extend(id.provider().search(req.clone()).await?);
                 }
-                results
+                Ok(results)
             }
         }
     }
@@ -72,7 +68,7 @@ pub struct Torrent {
 pub trait SearchProvider {
     async fn search(
         &self,
-        req: SearchRequest,
+        req: SearchRequest<'_>,
     ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>>;
 }
 
@@ -80,7 +76,7 @@ pub trait SearchProvider {
 enum SearchType {
     #[serde(rename = "score")]
     Score,
-    Percentage(u8), // Only allow 0-100%
+    Percentage(u8),
 }
 
 impl fmt::Display for SearchType {
@@ -120,10 +116,10 @@ enum OrderDirection {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SearchRequest {
+pub struct SearchRequest<'a> {
     search_type: SearchType,
     search_field: Option<String>,
-    query: String,
+    query: &'a str,
     order_by: OrderBy,
     order_direction: OrderDirection,
     categories: Option<Vec<u32>>,
@@ -133,8 +129,8 @@ pub struct SearchRequest {
     hide_xxx: bool,
 }
 
-impl SearchRequest {
-    pub fn new(query: String, categories: Option<Vec<u32>>) -> Self {
+impl<'a> SearchRequest<'a> {
+    pub fn new(query: &'a str, categories: Option<Vec<u32>>) -> Self {
         SearchRequest {
             search_type: SearchType::Score,
             search_field: None,

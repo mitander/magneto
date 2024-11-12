@@ -29,14 +29,12 @@ impl Knaben {
 impl SearchProvider for Knaben {
     async fn search(
         &self,
-        req: SearchRequest,
+        req: SearchRequest<'_>,
     ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
         let https = HttpsConnector::new();
         let client = Client::builder(TokioExecutor::new()).build::<_, Full<Bytes>>(https);
 
         let json = req.to_json()?;
-        println!("{}", json);
-
         let request = Request::builder()
             .method(Method::POST)
             .uri(URL)
@@ -96,7 +94,6 @@ impl Entry {
 fn parse(content: &str) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
     let entry_wrap: EntryWrap = serde_json::from_str(content)?;
     let entries = entry_wrap.hits;
-    println!("{:?}", entries);
     let results = entries
         .iter()
         .filter(|entry| entry.filter())

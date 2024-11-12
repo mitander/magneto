@@ -32,12 +32,12 @@ impl PirateBay {
 impl SearchProvider for PirateBay {
     async fn search(
         &self,
-        req: SearchRequest,
+        req: SearchRequest<'_>,
     ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
         let https = HttpsConnector::new();
         let client = Client::builder(TokioExecutor::new()).build::<_, Empty<Bytes>>(https);
 
-        let request = Request::get(URL.to_string() + &req.query)
+        let request = Request::get(URL.to_string() + req.query)
             .body(Empty::new())
             .expect("Request builder");
 
