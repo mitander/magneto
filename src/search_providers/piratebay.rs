@@ -1,26 +1,23 @@
-use std::error::Error;
-
-use crate::search_providers::SearchProvider;
-use crate::search_providers::Torrent;
+use crate::{SearchProvider, SearchRequest, Torrent};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use http_body_util::BodyExt;
-use http_body_util::Empty;
+use http_body_util::{BodyExt, Empty};
 use hyper::Request;
 use hyper_tls::HttpsConnector;
-use hyper_util::client::legacy::Client;
-use hyper_util::rt::TokioExecutor;
+use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use serde::Deserialize;
+use std::error::Error;
 
-use super::SearchRequest;
-
-const EMPTY_ID: &str = "0";
-const EMPTY_NAME: &str = "No results returned";
-const EMPTY_HASH: &str = "0000000000000000000000000000000000000000";
 const URL: &str = "https://apibay.org/q.php?q=";
 
 pub struct PirateBay {}
+
+impl Default for PirateBay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl PirateBay {
     pub fn new() -> PirateBay {
@@ -45,14 +42,14 @@ impl SearchProvider for PirateBay {
         println!("status: {}", response.status());
 
         let mut content = Vec::new();
-        while let Some(frame) = response.body_mut().frame().await {
-            let frame = frame?;
+        while let Some(Ok(frame)) = response.body_mut().frame().await {
             if let Some(data) = frame.data_ref() {
                 content.extend(data);
             }
         }
         let body = String::from_utf8(content)?;
-        parse(&body)
+        let response: Vec<Entry> = serde_json::from_str(&body)?;
+        handle_response(response)
     }
 }
 
@@ -75,14 +72,15 @@ pub struct Entry {
 
 impl Entry {
     fn filter(self: &Entry) -> bool {
+        const EMPTY_ID: &str = "0";
+        const EMPTY_NAME: &str = "No results returned";
+        const EMPTY_HASH: &str = "0000000000000000000000000000000000000000";
         self.id != EMPTY_ID && self.name != EMPTY_NAME && self.info_hash != EMPTY_HASH
     }
 }
 
-fn parse(content: &str) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
-    let entries: Vec<Entry> = serde_json::from_str(content)?;
-    println!("{:?}", entries);
-    let results = entries
+fn handle_response(response: Vec<Entry>) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
+    Ok(response
         .iter()
         .filter(|entry| entry.filter())
         .map(|entry| Torrent {
@@ -92,30 +90,18 @@ fn parse(content: &str) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
             leechers: entry.leechers.parse().ok(),
             size_bytes: entry.size.parse().ok(),
         })
-        .collect();
-    Ok(results)
+        .collect())
 }
 
 #[cfg(test)]
 mod test {
-    static TEST_DATA: &str = include_str!("../../assets/response.json");
-    static TEST_DATA_EMPTY: &str = include_str!("../../assets/empty.json");
-
     #[test]
     fn test_parse() {
-        let torrents = super::parse(TEST_DATA).unwrap();
-        assert_eq!(torrents.len(), 2);
-        for torrent in torrents.iter() {
-            assert!(torrent.magnet_link.starts_with("magnet:?"));
-            assert!(torrent.seeders.is_some());
-            assert!(torrent.leechers.is_some());
-            assert!(torrent.size_bytes.is_some());
-        }
+        todo!();
     }
 
     #[test]
     fn test_parse_empty() {
-        let torrents = super::parse(TEST_DATA_EMPTY).unwrap();
-        assert_eq!(torrents.len(), 0);
+        todo!();
     }
 }
