@@ -1,15 +1,8 @@
-use crate::{SearchProvider, SearchRequest, Torrent};
+use crate::{http_client, SearchProvider, SearchRequest, Torrent};
+use serde::Deserialize;
 
 use async_trait::async_trait;
-use bytes::Bytes;
-use http_body_util::{BodyExt, Empty};
-use hyper::Request;
-use hyper_tls::HttpsConnector;
-use hyper_util::{client::legacy::Client, rt::TokioExecutor};
-use serde::Deserialize;
 use std::error::Error;
-
-const URL: &str = "https://apibay.org/q.php?q=";
 
 pub struct PirateBay {}
 
@@ -31,23 +24,9 @@ impl SearchProvider for PirateBay {
         &self,
         req: SearchRequest<'_>,
     ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
-        let https = HttpsConnector::new();
-        let client = Client::builder(TokioExecutor::new()).build::<_, Empty<Bytes>>(https);
-
-        let request = Request::get(URL.to_string() + req.query)
-            .body(Empty::new())
-            .expect("Request builder");
-
-        let mut response = client.request(request).await?;
-        println!("status: {}", response.status());
-
-        let mut content = Vec::new();
-        while let Some(Ok(frame)) = response.body_mut().frame().await {
-            if let Some(data) = frame.data_ref() {
-                content.extend(data);
-            }
-        }
-        let body = String::from_utf8(content)?;
+        let client = http_client::HttpClient::new();
+        let url = "https://apibay.org/q.php?q=".parse().unwrap();
+        let body = client.send_get_request(url, req.query).await.unwrap();
         let response: Vec<Entry> = serde_json::from_str(&body)?;
         handle_response(response)
     }

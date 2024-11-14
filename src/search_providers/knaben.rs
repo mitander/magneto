@@ -1,15 +1,8 @@
-use crate::{SearchProvider, SearchRequest, Torrent};
+use crate::{http_client, SearchProvider, SearchRequest, Torrent};
 
 use async_trait::async_trait;
-use bytes::Bytes;
-use http_body_util::{BodyExt, Full};
-use hyper::{Method, Request};
-use hyper_tls::HttpsConnector;
-use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use serde::Deserialize;
 use std::error::Error;
-
-const URL: &str = "https://api.knaben.eu/v1";
 
 pub struct Knaben {}
 
@@ -31,26 +24,9 @@ impl SearchProvider for Knaben {
         &self,
         req: SearchRequest<'_>,
     ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
-        let https = HttpsConnector::new();
-        let client = Client::builder(TokioExecutor::new()).build::<_, Full<Bytes>>(https);
-
-        let json = serde_json::to_string(&req)?;
-        let request = Request::builder()
-            .method(Method::POST)
-            .uri(URL)
-            .header("Content-Type", "application/json")
-            .body(Full::from(json))?;
-
-        let mut response = client.request(request).await?;
-        println!("status: {}", response.status());
-
-        let mut content = Vec::new();
-        while let Some(Ok(frame)) = response.body_mut().frame().await {
-            if let Some(data) = frame.data_ref() {
-                content.extend(data);
-            }
-        }
-        let body = String::from_utf8(content)?;
+        let client = http_client::HttpClient::new();
+        let url = "http://api.knaben.eu/v1".parse().unwrap();
+        let body = client.send_post_request(url, req.query).await.unwrap();
         let response: Response = serde_json::from_str(&body)?;
         handle_response(response.hits)
     }
@@ -58,16 +34,16 @@ impl SearchProvider for Knaben {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-pub struct Total {
-    relation: String,
-    value: u16,
+pub struct Response {
+    total: Total,
+    hits: Vec<Entry>,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-pub struct Response {
-    hits: Vec<Entry>,
-    total: Total,
+pub struct Total {
+    relation: String,
+    value: u16,
 }
 
 #[allow(dead_code)]

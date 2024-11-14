@@ -1,3 +1,4 @@
+pub mod http_client;
 pub mod search_providers;
 
 use search_providers::{Knaben, PirateBay, SearchProvider};
