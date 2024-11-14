@@ -10,12 +10,12 @@ pub enum ClientError {
         source: anyhow::Error,
     },
     ServerResponseError {
-        code: u16,
+        code: reqwest::StatusCode,
         content: Option<String>,
     },
     RequestBuildError {
         source: anyhow::Error,
-        method: reqwest::Method,
+        method: crate::http_client::RequestMethod,
         url: String,
     },
     ReqwestBuildError {
@@ -32,7 +32,7 @@ pub enum ClientError {
 }
 
 impl std::fmt::Display for ClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "hello")
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
     }
 }

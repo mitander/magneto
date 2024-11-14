@@ -1,5 +1,8 @@
-use crate::{errors::ClientError, http_client::Client, SearchProvider, SearchRequest, Torrent};
-use reqwest::Method;
+use crate::{
+    errors::ClientError,
+    http_client::{Client, RequestMethod},
+    SearchProvider, SearchRequest, Torrent,
+};
 use serde::Deserialize;
 
 use async_trait::async_trait;
@@ -21,10 +24,14 @@ impl PirateBay {
 #[async_trait]
 impl SearchProvider for PirateBay {
     async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
-        let client = Client::default("https://apibay.org/q.php?");
-        let query = "q=".to_string() + req.query; // TODO:
-        let req = client.build_request(Method::GET, Some(query), None);
-        let res = client.send_request(req?).await?;
+        let client = Client::default();
+
+        let query = req.query.to_string();
+        let req = client
+            .build_request("https://apibay.org/q.php?=q", RequestMethod::GET(query))
+            .unwrap();
+
+        let res = client.send_request(req).await?;
         handle_response(serde_json::from_slice(&res).unwrap())
     }
 }

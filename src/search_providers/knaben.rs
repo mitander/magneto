@@ -1,10 +1,8 @@
 use crate::{
     errors,
-    http_client::{self, Client},
+    http_client::{self, Client, RequestMethod},
     SearchProvider, SearchRequest, Torrent,
 };
-
-use reqwest::Method;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -97,13 +95,15 @@ impl Knaben {
 #[async_trait]
 impl SearchProvider for Knaben {
     async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, errors::ClientError> {
+        let client = Client::default();
         let knaben_req = KnabenRequest::new(req);
-        let payload = http_client::build_body(&knaben_req)?;
 
-        let client = Client::default("https://api.knaben.eu/v1");
-        let req = client.build_request(Method::POST, None, Some(payload));
-        let res = client.send_request(req?).await?;
+        let body = http_client::build_body(&knaben_req)?;
+        let req = client
+            .build_request("https://api.knaben.eu/v1", RequestMethod::POST(body))
+            .unwrap();
 
+        let res = client.send_request(req).await?;
         let knaben_res: Response = serde_json::from_slice(&res).unwrap();
         handle_response(knaben_res.hits)
     }
