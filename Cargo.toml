@@ -3,14 +3,21 @@ name = "magneto"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["reqwest/default-tls"]
+blocking = ["reqwest/blocking"]
+rustls-tls = ["reqwest/rustls-tls"]
+
 [dependencies]
 bytes = "1.8.0"
-hyper = { version = "1.5.0", features = ["full"] }
-hyper-util = { version = "0.1.10", features = ["full"] }
-http-body-util = "0.1.2"
-hyper-tls = "0.6.0"
 clap = { version = "4.5.20", features = ["help", "usage", "error-context", "std", "derive"] }
 serde = { version = "1.0.214", features = ["derive"] }
 serde_json = "1.0.132"
 async-trait = "^0.1.83"
 tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread"] }
+reqwest = { version = "0.12.9", default-features = false, optional = true }
+url = "2.5.3"
+http = "1.1.0"
+anyhow = "1.0.93"
+serde_urlencoded = "0.7.1"
+thiserror = "2.0.3"

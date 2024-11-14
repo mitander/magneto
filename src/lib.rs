@@ -1,9 +1,11 @@
+pub mod errors;
 pub mod http_client;
 pub mod search_providers;
 
+use errors::ClientError;
 use search_providers::{Knaben, PirateBay, SearchProvider};
 use serde::{Deserialize, Serialize};
-use std::{error::Error, fmt};
+use std::fmt;
 
 pub enum ProviderID {
     PirateBay,
@@ -32,10 +34,7 @@ impl Magneto {
         Magneto { provider }
     }
 
-    pub async fn search(
-        &self,
-        req: SearchRequest<'_>,
-    ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
+    pub async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
         match &self.provider {
             Provider::Knaben => Knaben::new().search(req).await,
             Provider::PirateBay => PirateBay::new().search(req).await,
@@ -63,13 +62,13 @@ pub struct SearchRequest<'a> {
     query: &'a str,
     query_imdb_id: bool,
     order_by: OrderBy,
-    categories: Option<Vec<&'a str>>,
+    categories: Option<Vec<String>>,
     number_of_results: u32,
     hide_xxx: bool,
 }
 
 impl<'a> SearchRequest<'a> {
-    pub fn new(query: &'a str, categories: Option<Vec<&'a str>>) -> Self {
+    pub fn new(query: &'a str, categories: Option<Vec<String>>) -> Self {
         SearchRequest {
             query,
             query_imdb_id: false,

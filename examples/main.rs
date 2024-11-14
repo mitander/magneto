@@ -2,7 +2,7 @@ use magneto::{Magneto, Provider, SearchRequest};
 
 #[tokio::main]
 async fn main() {
-    let magneto = Magneto::new(Provider::Knaben);
+    let magneto = Magneto::new(Provider::PirateBay);
     let req = SearchRequest::new("Interstellar", None);
 
     match magneto.search(req).await {
@@ -11,6 +11,6 @@ async fn main() {
                 println!("name:{}, magnet:{}", res.name, res.magnet_link);
             }
         }
-        Err(e) => println!("Error: {}", e),
+        Err(e) => println!("Error: {:?}", e),
     }
 }

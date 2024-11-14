@@ -1,8 +1,84 @@
-use crate::{http_client, SearchProvider, SearchRequest, Torrent};
+use crate::{
+    errors,
+    http_client::{self, Client},
+    SearchProvider, SearchRequest, Torrent,
+};
+
+use reqwest::Method;
 
 use async_trait::async_trait;
-use serde::Deserialize;
-use std::error::Error;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+
+#[derive(Serialize, Deserialize, Debug)]
+enum SearchType {
+    #[serde(rename = "score")]
+    Score,
+    Percentage(u8),
+}
+impl fmt::Display for SearchType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SearchType::Score => write!(f, "score"),
+            SearchType::Percentage(val) => write!(f, "{}%", val),
+        }
+    }
+}
+#[derive(Serialize, Deserialize, Debug)]
+enum OrderBy {
+    #[serde(rename = "seeders")]
+    Seeders,
+    #[serde(rename = "peers")]
+    Peers,
+    Other(String),
+}
+impl fmt::Display for OrderBy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OrderBy::Seeders => write!(f, "seeders"),
+            OrderBy::Peers => write!(f, "peers"),
+            OrderBy::Other(other) => write!(f, "{}", other),
+        }
+    }
+}
+#[derive(Serialize, Deserialize, Debug)]
+enum OrderDirection {
+    #[serde(rename = "asc")]
+    Asc,
+    #[serde(rename = "desc")]
+    Desc,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KnabenRequest {
+    search_type: SearchType,
+    search_field: Option<String>,
+    query: String,
+    order_by: OrderBy,
+    order_direction: OrderDirection,
+    categories: Option<Vec<String>>,
+    from: u32,
+    size: u32,
+    hide_unsafe: bool,
+    hide_xxx: bool,
+}
+
+impl KnabenRequest {
+    pub fn new(req: SearchRequest<'_>) -> Self {
+        Self {
+            search_type: SearchType::Score,
+            search_field: Some("title".to_string()),
+            query: req.query.to_string(),
+            order_by: OrderBy::Seeders,
+            order_direction: OrderDirection::Desc,
+            categories: req.categories,
+            from: 0,
+            size: 50,
+            hide_unsafe: true,
+            hide_xxx: true,
+        }
+    }
+}
 
 pub struct Knaben {}
 
@@ -20,15 +96,16 @@ impl Knaben {
 
 #[async_trait]
 impl SearchProvider for Knaben {
-    async fn search(
-        &self,
-        req: SearchRequest<'_>,
-    ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
-        let client = http_client::HttpClient::new();
-        let url = "http://api.knaben.eu/v1".parse().unwrap();
-        let body = client.send_post_request(url, req.query).await.unwrap();
-        let response: Response = serde_json::from_str(&body)?;
-        handle_response(response.hits)
+    async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, errors::ClientError> {
+        let knaben_req = KnabenRequest::new(req);
+        let payload = http_client::build_body(&knaben_req)?;
+
+        let client = Client::default("https://api.knaben.eu/v1");
+        let req = client.build_request(Method::POST, None, Some(payload));
+        let res = client.send_request(req?).await?;
+
+        let knaben_res: Response = serde_json::from_slice(&res).unwrap();
+        handle_response(knaben_res.hits)
     }
 }
 
@@ -67,7 +144,7 @@ impl Entry {
     }
 }
 
-fn handle_response(response: Vec<Entry>) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
+fn handle_response(response: Vec<Entry>) -> Result<Vec<Torrent>, errors::ClientError> {
     Ok(response
         .iter()
         .filter(|entry| entry.filter())

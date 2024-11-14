@@ -1,8 +1,8 @@
-use crate::{http_client, SearchProvider, SearchRequest, Torrent};
+use crate::{errors::ClientError, http_client::Client, SearchProvider, SearchRequest, Torrent};
+use reqwest::Method;
 use serde::Deserialize;
 
 use async_trait::async_trait;
-use std::error::Error;
 
 pub struct PirateBay {}
 
@@ -20,15 +20,12 @@ impl PirateBay {
 
 #[async_trait]
 impl SearchProvider for PirateBay {
-    async fn search(
-        &self,
-        req: SearchRequest<'_>,
-    ) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
-        let client = http_client::HttpClient::new();
-        let url = "https://apibay.org/q.php?q=".parse().unwrap();
-        let body = client.send_get_request(url, req.query).await.unwrap();
-        let response: Vec<Entry> = serde_json::from_str(&body)?;
-        handle_response(response)
+    async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
+        let client = Client::default("https://apibay.org/q.php?");
+        let query = "q=".to_string() + req.query; // TODO:
+        let req = client.build_request(Method::GET, Some(query), None);
+        let res = client.send_request(req?).await?;
+        handle_response(serde_json::from_slice(&res).unwrap())
     }
 }
 
@@ -58,10 +55,13 @@ impl Entry {
     }
 }
 
-fn handle_response(response: Vec<Entry>) -> Result<Vec<Torrent>, Box<dyn Error + Send + Sync>> {
+fn handle_response(response: Vec<Entry>) -> Result<Vec<Torrent>, ClientError> {
     Ok(response
         .iter()
-        .filter(|entry| entry.filter())
+        .filter(|entry| {
+            println!("entry: {:?}", entry);
+            entry.filter()
+        })
         .map(|entry| Torrent {
             name: entry.name.clone(),
             magnet_link: format!("magnet:?xt=urn:btih:{}", entry.info_hash),
