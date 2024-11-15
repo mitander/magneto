@@ -3,17 +3,12 @@ use crate::{
     http_client::{Client, RequestMethod},
     SearchProvider, SearchRequest, Torrent,
 };
-use serde::Deserialize;
 
 use async_trait::async_trait;
+use serde::Deserialize;
 
+#[derive(Default)]
 pub struct PirateBay {}
-
-impl Default for PirateBay {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl PirateBay {
     pub fn new() -> PirateBay {
@@ -23,16 +18,16 @@ impl PirateBay {
 
 #[async_trait]
 impl SearchProvider for PirateBay {
-    async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
+    async fn execute_request(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
         let client = Client::default();
 
-        let query = req.query.to_string();
-        let req = client
-            .build_request("https://apibay.org/q.php?=q", RequestMethod::GET(query))
-            .unwrap();
+        // Url.parse() removes the '=q' suffix when parsed, add it to the query
+        let query = "q=".to_string() + req.query;
+        let req = client.build_request("https://apibay.org/q.php", RequestMethod::GET(query))?;
 
         let res = client.send_request(req).await?;
-        handle_response(serde_json::from_slice(&res).unwrap())
+        let res_data = serde_json::from_slice(&res).unwrap();
+        parse_response(res_data)
     }
 }
 
@@ -53,28 +48,21 @@ pub struct Entry {
     pub imdb: String,
 }
 
-impl Entry {
-    fn filter(self: &Entry) -> bool {
-        const EMPTY_ID: &str = "0";
-        const EMPTY_NAME: &str = "No results returned";
-        const EMPTY_HASH: &str = "0000000000000000000000000000000000000000";
-        self.id != EMPTY_ID && self.name != EMPTY_NAME && self.info_hash != EMPTY_HASH
-    }
-}
-
-fn handle_response(response: Vec<Entry>) -> Result<Vec<Torrent>, ClientError> {
+fn parse_response(response: Vec<Entry>) -> Result<Vec<Torrent>, ClientError> {
     Ok(response
         .iter()
         .filter(|entry| {
-            println!("entry: {:?}", entry);
-            entry.filter()
+            entry.id != "0"
+                && entry.name != "No results returned"
+                && entry.info_hash != "0000000000000000000000000000000000000000"
         })
         .map(|entry| Torrent {
             name: entry.name.clone(),
             magnet_link: format!("magnet:?xt=urn:btih:{}", entry.info_hash),
-            seeders: entry.seeders.parse().ok(),
-            leechers: entry.leechers.parse().ok(),
-            size_bytes: entry.size.parse().ok(),
+            seeders: entry.seeders.parse().unwrap_or(0),
+            peers: entry.leechers.parse().unwrap_or(0),
+            size_bytes: entry.size.parse().unwrap_or(0),
+            provider: "piratebay".to_string(),
         })
         .collect())
 }

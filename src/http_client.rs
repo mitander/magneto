@@ -12,7 +12,7 @@ pub enum RequestMethod {
 
 #[derive(Default)]
 pub struct Client {
-    pub http: reqwest::Client,
+    http: reqwest::Client,
 }
 
 impl Client {
