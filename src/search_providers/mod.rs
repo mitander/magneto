@@ -1,5 +1,6 @@
-use crate::{errors::ClientError, SearchRequest, Torrent};
 use async_trait::async_trait;
+
+use crate::{errors::ClientError, http_client::HttpClient, SearchRequest, Torrent};
 
 pub mod knaben;
 pub mod piratebay;
@@ -9,5 +10,10 @@ pub use piratebay::PirateBay;
 
 #[async_trait]
 pub trait SearchProvider {
-    async fn execute_request(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError>;
+    async fn request_torrents(
+        &self,
+        client: &HttpClient,
+        request: SearchRequest<'_>,
+    ) -> Result<Vec<Torrent>, ClientError>;
+    fn parse_response(&self, response: &str) -> Result<Vec<Torrent>, ClientError>;
 }

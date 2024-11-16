@@ -15,7 +15,6 @@ pub enum ClientError {
     },
     RequestBuildError {
         source: anyhow::Error,
-        method: crate::http_client::RequestMethod,
         url: String,
     },
     ReqwestBuildError {
@@ -33,6 +32,7 @@ pub enum ClientError {
 
 impl std::fmt::Display for ClientError {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: fix this
         todo!()
     }
 }

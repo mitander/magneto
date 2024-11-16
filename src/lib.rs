@@ -2,11 +2,12 @@ pub mod errors;
 pub mod http_client;
 pub mod search_providers;
 
-use core::panic;
-use errors::ClientError;
-use search_providers::{Knaben, PirateBay, SearchProvider};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fmt};
+
+use errors::ClientError;
+use http_client::HttpClient;
+use search_providers::{Knaben, PirateBay, SearchProvider};
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub enum Provider {
@@ -57,10 +58,15 @@ impl Magneto {
     }
 
     pub async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
-        let mut results = Vec::new();
+        let client = HttpClient::new();
 
+        let mut results = Vec::new();
         for provider in &self.active_providers {
-            match provider.initialize().execute_request(req.clone()).await {
+            match provider
+                .initialize()
+                .request_torrents(&client, req.clone())
+                .await
+            {
                 Ok(mut torrents) => results.append(&mut torrents),
                 Err(_) => panic!(),
             }

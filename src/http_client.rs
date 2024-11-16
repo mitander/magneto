@@ -1,106 +1,93 @@
 use crate::errors::ClientError;
 
-use reqwest::{Method, Request};
-use serde::Serialize;
-use url::Url;
+use reqwest::{header::CONTENT_TYPE, Client, Request};
 
 #[derive(Debug, Clone)]
-pub enum RequestMethod {
-    GET(String),
-    POST(Vec<u8>),
+pub enum RequestType<'a> {
+    Get(&'a [(&'a str, &'a str)]),
+    Post(&'a serde_json::Value),
 }
 
 #[derive(Default)]
-pub struct Client {
-    http: reqwest::Client,
+pub struct HttpClient {
+    client: Client,
 }
 
-impl Client {
-    pub fn new(http: reqwest::Client) -> Self {
-        Client { http }
+impl HttpClient {
+    pub fn new() -> Self {
+        HttpClient {
+            client: Client::new(),
+        }
+    }
+
+    pub fn with_client(client: Client) -> Self {
+        HttpClient { client }
     }
 }
 
-impl Client {
-    pub async fn send_request(&self, req: Request) -> Result<Vec<u8>, ClientError> {
+impl HttpClient {
+    pub async fn request(
+        &self,
+        url: &str,
+        request_type: RequestType<'_>,
+    ) -> Result<String, ClientError> {
+        let request = self.build_request(url, request_type)?;
+        self.send_request(request).await
+    }
+
+    async fn send_request(&self, request: Request) -> Result<String, ClientError> {
         println!(
             "Client sending {} request to {} with {} bytes of data",
-            req.method(),
-            req.url(),
-            req.body().as_slice().len()
+            request.method(),
+            request.url(),
+            request.body().as_slice().len()
         );
 
-        let url_err = req.url().to_string();
-        let method_err = req.method().to_string();
         let response = self
-            .http
-            .execute(req)
+            .client
+            .execute(request)
             .await
-            .map_err(|e| ClientError::RequestError {
-                source: e.into(),
-                url: url_err,
-                method: method_err,
-            })?;
+            .map_err(|e| ClientError::ResponseError { source: e.into() })?;
 
         let status = response.status();
-        let body = response
-            .bytes()
+        let response_content = response
+            .text()
             .await
-            .map_err(|e| ClientError::ResponseError { source: e.into() })?
-            .to_vec();
+            .map_err(|e| ClientError::ResponseError { source: e.into() })?;
 
         println!(
             "Client received {} response with {} bytes of body data",
             status,
-            body.len()
+            response_content.len()
         );
 
         if !status.is_success() {
             return Err(ClientError::ServerResponseError {
                 code: status,
-                content: String::from_utf8(body).ok(),
+                content: Some(response_content.clone()),
             });
         }
-        Ok(body)
+
+        Ok(response_content)
     }
 
-    pub fn build_request(&self, url: &str, method: RequestMethod) -> Result<Request, ClientError> {
-        println!("Building endpoint request");
-        let mut url = Url::parse(url).map_err(|e| ClientError::UrlParseError { source: e })?;
-        let method_err = method.clone();
-        let url_error = url.to_string();
+    fn build_request(&self, url: &str, request_type: RequestType) -> Result<Request, ClientError> {
+        println!("Building request for {}", url);
 
-        let req = match method {
-            RequestMethod::POST(data) => self
-                .http
-                .request(Method::POST, url)
-                .header(reqwest::header::CONTENT_TYPE, "application/json")
-                .body(data)
-                .build(),
-            RequestMethod::GET(query) => {
-                url.set_query(Some(query.as_str()));
-                self.http.request(Method::GET, url).build()
-            }
+        let request_builder = match request_type {
+            RequestType::Get(params) => self.client.get(url).query(params),
+            RequestType::Post(body) => self
+                .client
+                .post(url)
+                .header(CONTENT_TYPE, "application/json")
+                .body(body.to_string()),
         };
 
-        req.map_err(|e| ClientError::RequestBuildError {
-            source: e.into(),
-            method: method_err,
-            url: url_error,
-        })
+        request_builder
+            .build()
+            .map_err(|e| ClientError::RequestBuildError {
+                source: e.into(),
+                url: url.to_string(),
+            })
     }
-}
-
-pub fn build_body(data: &impl Serialize) -> Result<Vec<u8>, ClientError> {
-    let data = serde_json::to_string(data)
-        .map_err(|e| ClientError::DataParseError { source: e.into() })?;
-    Ok(match data.as_str() {
-        "null" | "{}" => Vec::new(),
-        _ => data.as_bytes().to_vec(),
-    })
-}
-
-pub fn build_query(data: &impl Serialize) -> Result<String, ClientError> {
-    serde_urlencoded::to_string(data)
-        .map_err(|e| ClientError::UrlQueryParseError { source: e.into() })
 }

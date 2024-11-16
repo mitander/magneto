@@ -1,14 +1,14 @@
-use crate::{
-    errors,
-    http_client::{self, Client, RequestMethod},
-    SearchProvider, SearchRequest, Torrent,
-};
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+use crate::{
+    errors::ClientError,
+    http_client::{HttpClient, RequestType},
+    SearchProvider, SearchRequest, Torrent,
+};
+
 #[derive(Default)]
-pub struct Knaben {}
+pub struct Knaben;
 
 impl Knaben {
     pub fn new() -> Knaben {
@@ -18,19 +18,41 @@ impl Knaben {
 
 #[async_trait]
 impl SearchProvider for Knaben {
-    async fn execute_request(
+    async fn request_torrents(
         &self,
-        req: SearchRequest<'_>,
-    ) -> Result<Vec<Torrent>, errors::ClientError> {
-        let client = Client::default();
-        let knaben_req = KnabenRequest::from_search_request(req);
+        client: &HttpClient,
+        request: SearchRequest<'_>,
+    ) -> Result<Vec<Torrent>, ClientError> {
+        let knaben_request = KnabenRequest::from_search_request(request);
+        let json = serde_json::to_value(&knaben_request)
+            .map_err(|e| ClientError::DataParseError { source: e.into() })?;
 
-        let body = http_client::build_body(&knaben_req)?;
-        let req = client.build_request("https://api.knaben.eu/v1", RequestMethod::POST(body))?;
+        let raw_response = client
+            .request("https://api.knaben.eu/v1", RequestType::Post(&json))
+            .await?;
 
-        let res = client.send_request(req).await?;
-        let res_data: Response = serde_json::from_slice(&res).unwrap();
-        handle_response(res_data.hits)
+        self.parse_response(&raw_response)
+    }
+
+    fn parse_response(&self, response: &str) -> Result<Vec<Torrent>, ClientError> {
+        let response: Response = serde_json::from_str(response)
+            .map_err(|e| ClientError::DataParseError { source: e.into() })?;
+
+        let torrents = response
+            .hits
+            .iter()
+            .filter(|entry| entry.hash.is_some() && entry.peers != 0)
+            .map(|entry| Torrent {
+                name: entry.title.to_owned(),
+                magnet_link: format!("magnet:?xt=urn:btih:{}", entry.hash.to_owned().unwrap()),
+                seeders: entry.seeders,
+                peers: entry.peers,
+                size_bytes: entry.bytes,
+                provider: entry.tracker.to_owned(),
+            })
+            .collect();
+
+        Ok(torrents)
     }
 }
 
@@ -52,21 +74,6 @@ pub struct Entry {
     date: String,
     tracker: String,
     category_id: Vec<u32>,
-}
-
-fn handle_response(response: Vec<Entry>) -> Result<Vec<Torrent>, errors::ClientError> {
-    Ok(response
-        .iter()
-        .filter(|entry| entry.hash.is_some() && entry.peers != 0)
-        .map(|entry| Torrent {
-            name: entry.title.clone(),
-            magnet_link: format!("magnet:?xt=urn:btih:{}", entry.hash.to_owned().unwrap()),
-            seeders: entry.seeders,
-            peers: entry.peers,
-            size_bytes: entry.bytes,
-            provider: entry.tracker.clone(),
-        })
-        .collect())
 }
 
 #[derive(Serialize, Deserialize, Debug)]
