@@ -1,81 +1,13 @@
 pub mod errors;
-pub mod http_client;
 pub mod search_providers;
 
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fmt};
 
 use errors::ClientError;
-use http_client::HttpClient;
 use search_providers::{Knaben, PirateBay, SearchProvider};
 
-#[derive(PartialEq, Eq, Hash, Clone)]
-pub enum Provider {
-    Knaben,
-    PirateBay,
-}
-
-impl Provider {
-    pub fn initialize(&self) -> Box<dyn SearchProvider> {
-        match self {
-            Provider::PirateBay => Box::new(PirateBay::new()),
-            Provider::Knaben => Box::new(Knaben::new()),
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct Magneto {
-    active_providers: HashSet<Provider>,
-}
-
-impl Magneto {
-    pub fn new() -> Self {
-        let all_providers: HashSet<Provider> = vec![Provider::PirateBay, Provider::Knaben]
-            .into_iter()
-            .collect();
-
-        Self {
-            active_providers: all_providers,
-        }
-    }
-
-    pub fn with_providers(providers: Vec<Provider>) -> Self {
-        Self {
-            active_providers: providers.into_iter().collect(),
-        }
-    }
-    pub fn add_provider(&mut self, provider: Provider) {
-        self.active_providers.insert(provider);
-    }
-
-    pub fn remove_provider(&mut self, provider: &Provider) -> bool {
-        self.active_providers.remove(provider)
-    }
-
-    pub fn active_providers(&self) -> Vec<Provider> {
-        self.active_providers.iter().cloned().collect()
-    }
-
-    pub async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
-        let client = HttpClient::new();
-
-        let mut results = Vec::new();
-        for provider in &self.active_providers {
-            match provider
-                .initialize()
-                .request_torrents(&client, req.clone())
-                .await
-            {
-                Ok(mut torrents) => results.append(&mut torrents),
-                Err(_) => panic!(),
-            }
-        }
-
-        Ok(results)
-    }
-}
-
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Torrent {
     pub name: String,
     pub magnet_link: String,
@@ -83,6 +15,12 @@ pub struct Torrent {
     pub peers: u32,
     pub size_bytes: u64,
     pub provider: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum OrderBy {
+    Seeders,
+    Peers,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -97,7 +35,7 @@ pub struct SearchRequest<'a> {
 
 impl<'a> SearchRequest<'a> {
     pub fn new(query: &'a str, categories: Option<Vec<String>>) -> Self {
-        SearchRequest {
+        Self {
             query,
             query_imdb_id: false,
             order_by: OrderBy::Seeders,
@@ -108,19 +46,56 @@ impl<'a> SearchRequest<'a> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-enum OrderBy {
-    #[serde(rename = "seeders")]
-    Seeders,
-    #[serde(rename = "peers")]
-    Peers,
+#[derive(Default)]
+pub struct Magneto {
+    active_providers: Vec<Box<dyn SearchProvider>>,
 }
 
-impl fmt::Display for OrderBy {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            OrderBy::Seeders => write!(f, "seeders"),
-            OrderBy::Peers => write!(f, "peers"),
+impl Magneto {
+    pub fn new() -> Self {
+        let providers: Vec<Box<dyn SearchProvider>> =
+            vec![Box::new(Knaben::new()), Box::new(PirateBay::new())];
+
+        Self {
+            active_providers: providers,
         }
+    }
+
+    pub fn with_providers(providers: Vec<Box<dyn SearchProvider>>) -> Self {
+        Self {
+            active_providers: providers,
+        }
+    }
+
+    pub fn add_provider(&mut self, provider: Box<dyn SearchProvider>) {
+        let provider_id = provider.id();
+
+        if self
+            .active_providers
+            .iter()
+            .any(|existing| existing.id() == provider_id)
+        {
+            println!(
+                "Provider '{}' already exists. Skipping addition.",
+                provider_id
+            );
+            return;
+        }
+
+        self.active_providers.push(provider);
+    }
+
+    pub async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
+        let client = Client::new();
+        let mut results = Vec::new();
+
+        for provider in &self.active_providers {
+            match provider.send_request(&client, req.clone()).await {
+                Ok(mut torrents) => results.append(&mut torrents),
+                Err(_) => panic!(),
+            }
+        }
+
+        Ok(results)
     }
 }

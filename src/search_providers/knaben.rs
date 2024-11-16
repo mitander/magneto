@@ -1,37 +1,47 @@
 use async_trait::async_trait;
+use reqwest::{header::CONTENT_TYPE, Client, Request};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    errors::ClientError,
-    http_client::{HttpClient, RequestType},
-    SearchProvider, SearchRequest, Torrent,
-};
+use crate::{errors::ClientError, SearchProvider, SearchRequest, Torrent};
 
-#[derive(Default)]
-pub struct Knaben;
+pub struct Knaben {
+    api_url: String,
+}
 
 impl Knaben {
-    pub fn new() -> Knaben {
-        Knaben {}
+    pub fn new() -> Self {
+        Self {
+            api_url: "https://api.knaben.eu/v1".to_string(),
+        }
+    }
+}
+
+impl Default for Knaben {
+    fn default() -> Self {
+        Knaben::new()
     }
 }
 
 #[async_trait]
 impl SearchProvider for Knaben {
-    async fn request_torrents(
+    fn build_request(
         &self,
-        client: &HttpClient,
+        client: &Client,
         request: SearchRequest<'_>,
-    ) -> Result<Vec<Torrent>, ClientError> {
+    ) -> Result<Request, ClientError> {
         let knaben_request = KnabenRequest::from_search_request(request);
         let json = serde_json::to_value(&knaben_request)
             .map_err(|e| ClientError::DataParseError { source: e.into() })?;
 
-        let raw_response = client
-            .request("https://api.knaben.eu/v1", RequestType::Post(&json))
-            .await?;
-
-        self.parse_response(&raw_response)
+        client
+            .post(self.api_url.clone())
+            .header(CONTENT_TYPE, "application/json")
+            .body(json.to_string())
+            .build()
+            .map_err(|e| ClientError::RequestBuildError {
+                source: e.into(),
+                url: self.api_url.clone(),
+            })
     }
 
     fn parse_response(&self, response: &str) -> Result<Vec<Torrent>, ClientError> {
@@ -48,23 +58,27 @@ impl SearchProvider for Knaben {
                 seeders: entry.seeders,
                 peers: entry.peers,
                 size_bytes: entry.bytes,
-                provider: entry.tracker.to_owned(),
+                provider: format!("{} (via knaben)", entry.tracker),
             })
             .collect();
 
         Ok(torrents)
     }
+
+    fn id(&self) -> String {
+        self.api_url.clone()
+    }
 }
 
 #[derive(Debug, Deserialize)]
 struct Response {
-    hits: Vec<Entry>,
+    hits: Vec<ResponseEntry>,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Entry {
+pub struct ResponseEntry {
     id: String,
     title: String,
     hash: Option<String>,
@@ -77,19 +91,11 @@ pub struct Entry {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum SearchType {
-    #[serde(rename = "score")]
-    Score,
-    Percentage(u8),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub enum OrderBy {
     #[serde(rename = "seeders")]
     Seeders,
     #[serde(rename = "peers")]
     Peers,
-    Other(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -102,7 +108,7 @@ pub enum OrderDirection {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct KnabenRequest {
-    pub search_type: SearchType,
+    pub search_type: String,
     pub search_field: String,
     pub query: String,
     pub order_by: OrderBy,
@@ -118,7 +124,7 @@ pub struct KnabenRequest {
 impl KnabenRequest {
     pub fn from_search_request(req: SearchRequest<'_>) -> Self {
         Self {
-            search_type: SearchType::Score,
+            search_type: "score".to_string(),
             search_field: "title".to_string(),
             query: req.query.to_string(),
             order_by: OrderBy::Seeders,
