@@ -1,8 +1,8 @@
-//! # Piratebay (apibay.org) Search Provider
+//! # PirateBay (apibay.org) Search Provider
 //!
 //! The `PirateBay` implementation of the `SearchProvider` trait allows querying
-//! Piratebay API for torrent metadata. This provider formats queries,
-//! sends them to Piratebay API, and parses the resulting JSON response into
+//! PirateBay API for torrent metadata. This provider formats queries,
+//! sends them to PirateBay API, and parses the resulting JSON response into
 //! a unified `Torrent` structure.
 
 use async_trait::async_trait;
@@ -11,7 +11,7 @@ use serde::Deserialize;
 
 use crate::{errors::ClientError, SearchProvider, SearchRequest, Torrent};
 
-/// Represents a single entry in the Pirate Bay API response.
+/// Represents a single entry in the PirateBay API response.
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct ResponseEntry {
@@ -52,9 +52,9 @@ pub struct ResponseEntry {
     pub imdb: String,
 }
 
-/// The `PirateBay` provider handles querying and parsing data from the Pirate Bay API.
+/// The `PirateBay` provider handles querying and parsing data from the PirateBay API.
 pub struct PirateBay {
-    /// The base URL for the Pirate Bay API.
+    /// The base URL for the PirateBay API.
     api_url: String,
 }
 
@@ -79,7 +79,7 @@ impl Default for PirateBay {
 
 #[async_trait]
 impl SearchProvider for PirateBay {
-    /// Builds the request to query the Pirate Bay API.
+    /// Builds the request to query the PirateBay API.
     ///
     /// # Parameters
     /// - `client`: The HTTP client used to build the request.
@@ -105,7 +105,7 @@ impl SearchProvider for PirateBay {
             })
     }
 
-    /// Parses the response from the Pirate Bay API into a list of torrents.
+    /// Parses the response from the PirateBay API into a list of torrents.
     ///
     /// # Parameters
     /// - `response`: The raw response body as a string.

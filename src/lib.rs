@@ -135,7 +135,7 @@ pub struct Torrent {
 
 /// Enum specifying the order by which search results are sorted.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum OrderBy {
+pub enum OrderBy {
     /// Sort results by the number of seeders.
     Seeders,
 
@@ -147,26 +147,32 @@ enum OrderBy {
 #[derive(Serialize, Debug, Clone)]
 pub struct SearchRequest<'a> {
     /// The query string to search for.
-    query: &'a str,
+    pub query: &'a str,
 
     /// Whether to query by IMDb ID (not implemented yet).
-    query_imdb_id: bool,
+    pub query_imdb_id: bool,
 
     /// The order by which results are sorted (default: `Seeders`).
-    order_by: OrderBy,
+    pub order_by: OrderBy,
 
     /// Optional categories to filter results by.
-    categories: Option<Vec<String>>,
+    pub categories: Option<Vec<String>>,
 
     /// The number of results to retrieve (default: 50).
-    number_of_results: u32,
+    pub number_of_results: u32,
 
     /// Whether to hide adult content (default: true).
-    hide_xxx: bool,
+    pub hide_xxx: bool,
 }
 
 impl<'a> SearchRequest<'a> {
     /// Creates a new `SearchRequest` with the specified query and optional categories.
+    ///
+    /// The default values are:
+    /// - `query_imdb_id`: `false`
+    /// - `order_by`: `OrderBy::Seeders`
+    /// - `number_of_results`: `50`
+    /// - `hide_xxx`: `true`
     ///
     /// # Parameters
     /// - `query`: The search term or phrase.

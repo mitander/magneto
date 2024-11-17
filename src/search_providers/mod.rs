@@ -32,12 +32,6 @@ pub trait SearchProvider: Send + Sync {
     /// # Returns
     /// - `Ok(Vec<Torrent>)`: A list of parsed torrents on success.
     /// - `Err(ClientError)`: An error if the request or parsing fails.
-    ///
-    /// The default implementation:
-    /// 1. Calls `build_request` to construct the HTTP request.
-    /// 2. Logs the request and response details.
-    /// 3. Executes the request using the provided HTTP client.
-    /// 4. Calls `parse_response` to process the response body.
     async fn send_request(
         &self,
         client: &Client,
