@@ -62,7 +62,7 @@ async fn main() {
     // Create instance from list of providers
     let providers: Vec<Box<dyn SearchProvider>> =
         vec![Box::new(Knaben::new()), Box::new(PirateBay::new())];
-    let _magneto = Magneto::with_providers(providers);
+    let magneto = Magneto::with_providers(providers);
 
     // Or add new providers like this
     let magneto = Magneto::default()
@@ -74,16 +74,9 @@ async fn main() {
 ### Adding a custom provider
 
 ```rust
-use magneto::{errors::ClientError, Magneto, SearchProvider, SearchRequest, Torrent};
-use reqwest::{Client, Request};
+use magneto::{ClientError, Magneto, SearchProvider, SearchRequest, Torrent, Client, Request};
 
 struct CustomProvider;
-
-impl CustomProvider {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
 
 impl SearchProvider for CustomProvider {
     fn parse_response(&self, response: &str) -> Result<Vec<Torrent>, ClientError> {
@@ -105,7 +98,7 @@ impl SearchProvider for CustomProvider {
 
 #[tokio::main]
 async fn main() {
-    let custom_provider = CustomProvider::new();
+    let custom_provider = CustomProvider{};
     let magneto = Magneto::new().add_provider(Box::new(custom_provider));
 }
 ```
