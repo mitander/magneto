@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use reqwest::{header::CONTENT_TYPE, Client, Request};
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::ClientError, SearchProvider, SearchRequest, Torrent};
+use crate::{errors::ClientError, Category, SearchProvider, SearchRequest, Torrent};
 
 /// The `Knaben` provider handles querying and parsing data from the Knaben API.
 pub struct Knaben {
@@ -106,39 +106,36 @@ impl SearchProvider for Knaben {
 
 /// Represents the structure of a Knaben API request.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct KnabenRequest {
+struct KnabenRequest {
     /// The type of search to perform.
-    pub search_type: String,
+    search_type: String,
 
     /// The field to search within.
-    pub search_field: String,
+    search_field: String,
 
     /// The query string to search for.
-    pub query: String,
+    query: String,
 
     /// The field by which results are ordered.
-    pub order_by: OrderBy,
+    order_by: String,
 
-    /// The direction of ordering (ascending/descending).
-    pub order_direction: OrderDirection,
+    /// The direction of ordering (asc/desc).
+    order_direction: String,
 
     /// Optional categories to filter results by.
-    pub categories: Option<Vec<String>>,
-
-    /// The starting index for the results.
-    pub from: u32,
+    categories: Option<Vec<u32>>,
 
     /// The number of results to retrieve.
-    pub size: u32,
+    size: u32,
 
-    /// Whether to hide unsafe content.
-    pub hide_unsafe: bool,
+    /// Whether to hide very old results and results that has a high potential virus score.
+    hide_unsafe: bool,
 
     /// Whether to hide adult content.
-    pub hide_xxx: bool,
+    hide_xxx: bool,
 
     /// Time (in seconds) since the last seen torrent to filter results.
-    pub seconds_since_last_seen: u32,
+    seconds_since_last_seen: u32,
 }
 impl KnabenRequest {
     /// Converts a `SearchRequest` into a `KnabenRequest`.
@@ -148,18 +145,32 @@ impl KnabenRequest {
     ///
     /// # Returns
     /// - `KnabenRequest`: A request formatted for the Knaben API.
-    pub fn from_search_request(req: SearchRequest<'_>) -> Self {
+    pub fn from_search_request(request: SearchRequest<'_>) -> Self {
+        let categories: Option<Vec<u32>> = request.categories.map(|categories| {
+            categories
+                .into_iter()
+                .map(|category| match category {
+                    Category::Movies => 3000000,
+                    Category::TvShows => 2000000,
+                    Category::Games => 4001000,
+                    Category::Software => 4002000,
+                    Category::Audio => 1000000,
+                    Category::Anime => 6000000,
+                    Category::Xxx => 5000000,
+                })
+                .collect()
+        });
+
         Self {
             search_type: "score".to_string(),
             search_field: "title".to_string(),
-            query: req.query.to_string(),
-            order_by: OrderBy::Seeders,
-            order_direction: OrderDirection::Desc,
-            categories: req.categories,
-            from: 0,
+            query: request.query.to_string(),
+            order_by: request.order_by.to_string(),
+            order_direction: "desc".to_string(),
+            categories,
             size: 50,
             hide_unsafe: true,
-            hide_xxx: true,
+            hide_xxx: request.hide_xxx,
             seconds_since_last_seen: 86400, // 24hr
         }
     }
@@ -204,28 +215,4 @@ pub struct ResponseEntry {
 
     /// Categories associated with the torrent.
     category_id: Vec<u32>,
-}
-
-/// Specifies the ordering options for search results.
-#[derive(Serialize, Deserialize, Debug)]
-pub enum OrderBy {
-    /// Order results by the number of seeders.
-    #[serde(rename = "seeders")]
-    Seeders,
-
-    /// Order results by the number of peers.
-    #[serde(rename = "peers")]
-    Peers,
-}
-
-/// Specifies the direction of ordering for search results.
-#[derive(Serialize, Deserialize, Debug)]
-pub enum OrderDirection {
-    /// Order results in ascending order.
-    #[serde(rename = "asc")]
-    Asc,
-
-    /// Order results in descending order.
-    #[serde(rename = "desc")]
-    Desc,
 }

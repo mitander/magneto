@@ -18,19 +18,23 @@
 //! ### Creating a `Magneto` instance and searching
 //!
 //! ```rust
-//! use magneto::{Magneto, SearchRequest};
+//! use magneto::{Category, Magneto, SearchRequest};
 //!
 //! #[tokio::main]
 //! async fn main() {
 //!     let magneto = Magneto::new();
 //!
-//!     let request = SearchRequest::new("Ubuntu", None);
+//!     let request = SearchRequest::new("Ubuntu", Some(vec![Category::Software]));
 //!     match magneto.search(request).await {
 //!         Ok(results) => {
 //!             for torrent in results {
 //!                 println!(
-//!                     "found: {} (seeders: {}, peers: {})",
-//!                     torrent.name, torrent.seeders, torrent.peers
+//!                     "found: {} from {} with magnet link {} (seeders: {}, peers: {})",
+//!                     torrent.name,
+//!                     torrent.provider,
+//!                     torrent.magnet_link,
+//!                     torrent.seeders,
+//!                     torrent.peers,
 //!                 );
 //!             }
 //!         }
@@ -104,6 +108,8 @@
 pub mod errors;
 pub mod search_providers;
 
+use core::fmt;
+
 use log::debug;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -133,14 +139,48 @@ pub struct Torrent {
     pub provider: String,
 }
 
+/// Enum specifying the different categories available for torrents.
+#[derive(Serialize, Debug, Clone)]
+pub enum Category {
+    /// Represents the category for movies.
+    Movies,
+
+    /// Represents the category for TV shows.
+    TvShows,
+
+    /// Represents the category for games.
+    Games,
+
+    /// Represents the category for software.
+    Software,
+
+    /// Represents the category for audio.
+    Audio,
+
+    /// Represents the category for anime.
+    Anime,
+
+    /// Represents the category for adult content.
+    Xxx,
+}
+
 /// Enum specifying the order by which search results are sorted.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub enum OrderBy {
     /// Sort results by the number of seeders.
     Seeders,
 
     /// Sort results by the number of peers.
     Peers,
+}
+
+impl fmt::Display for OrderBy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OrderBy::Seeders => write!(f, "seeders"),
+            OrderBy::Peers => write!(f, "peers"),
+        }
+    }
 }
 
 /// Represents a search request to be sent to torrent providers.
@@ -152,35 +192,37 @@ pub struct SearchRequest<'a> {
     /// Whether to query by IMDb ID (not implemented yet).
     pub query_imdb_id: bool,
 
-    /// The order by which results are sorted (default: `Seeders`).
+    /// The order by which results are sorted.
     pub order_by: OrderBy,
 
     /// Optional categories to filter results by.
-    pub categories: Option<Vec<String>>,
+    pub categories: Option<Vec<Category>>,
 
-    /// The number of results to retrieve (default: 50).
+    /// The number of results to retrieve.
     pub number_of_results: u32,
 
-    /// Whether to hide adult content (default: true).
+    /// Whether to hide adult content.
     pub hide_xxx: bool,
 }
 
 impl<'a> SearchRequest<'a> {
     /// Creates a new `SearchRequest` with the specified query and optional categories.
     ///
-    /// The default values are:
+    /// Remaining fields gets the following default values:
     /// - `query_imdb_id`: `false`
     /// - `order_by`: `OrderBy::Seeders`
     /// - `number_of_results`: `50`
     /// - `hide_xxx`: `true`
     ///
+    /// You can customize these fields by struct initialization.
+    ///
     /// # Parameters
     /// - `query`: The search term or phrase.
-    /// - `categories`: An optional list of categories to filter results.
+    /// - `categories`: An optional list of `Category` to filter results.
     ///
     /// # Returns
     /// - A new `SearchRequest` instance.
-    pub fn new(query: &'a str, categories: Option<Vec<String>>) -> Self {
+    pub fn new(query: &'a str, categories: Option<Vec<Category>>) -> Self {
         Self {
             query,
             query_imdb_id: false,

@@ -9,48 +9,7 @@ use async_trait::async_trait;
 use reqwest::{Client, Request};
 use serde::Deserialize;
 
-use crate::{errors::ClientError, SearchProvider, SearchRequest, Torrent};
-
-/// Represents a single entry in the PirateBay API response.
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-pub struct ResponseEntry {
-    /// The unique identifier for the torrent.
-    pub id: String,
-
-    /// The name or title of the torrent.
-    pub name: String,
-
-    /// The hash of the torrent, used in magnet links.
-    pub info_hash: String,
-
-    /// The number of leechers for the torrent as a string.
-    pub leechers: String,
-
-    /// The number of seeders for the torrent as a string.
-    pub seeders: String,
-
-    /// The number of files included in the torrent.
-    pub num_files: String,
-
-    /// The size of the torrent in bytes, represented as a string.
-    pub size: String,
-
-    /// The username of the uploader who shared the torrent.
-    pub username: String,
-
-    /// The date when the torrent was added.
-    pub added: String,
-
-    /// The status of the torrent (e.g., active, inactive).
-    pub status: String,
-
-    /// The category of the torrent (e.g., movies, games, software).
-    pub category: String,
-
-    /// The IMDb ID associated with the torrent, if available.
-    pub imdb: String,
-}
+use crate::{errors::ClientError, Category, SearchProvider, SearchRequest, Torrent};
 
 /// The `PirateBay` provider handles querying and parsing data from the PirateBay API.
 pub struct PirateBay {
@@ -65,7 +24,7 @@ impl PirateBay {
     /// - `PirateBay`: A new provider instance with the default API URL.
     pub fn new() -> Self {
         Self {
-            api_url: "https://apibay.org/q.php?".to_string(),
+            api_url: "https://apibay.org/q.php".to_string(),
         }
     }
 }
@@ -93,7 +52,22 @@ impl SearchProvider for PirateBay {
         client: &Client,
         request: SearchRequest<'_>,
     ) -> Result<Request, ClientError> {
-        let query = &[("q", request.query)];
+        let categories: Vec<String> = request
+            .categories
+            .unwrap_or_default()
+            .into_iter()
+            .map(|category| match category {
+                Category::Movies => "201,202,207,209,211".to_string(),
+                Category::TvShows => "205,208,212".to_string(),
+                Category::Games => 400.to_string(),
+                Category::Software => 300.to_string(),
+                Category::Audio => 100.to_string(),
+                Category::Anime => 200.to_string(), // not supported: list all video results
+                Category::Xxx => 500.to_string(),
+            })
+            .collect();
+
+        let query = &[("q", request.query), ("cat", &categories.join(","))];
 
         client
             .get(self.api_url.clone())
@@ -144,4 +118,45 @@ impl SearchProvider for PirateBay {
     fn id(&self) -> String {
         self.api_url.clone()
     }
+}
+
+/// Represents a single entry in the PirateBay API response.
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct ResponseEntry {
+    /// The unique identifier for the torrent.
+    pub id: String,
+
+    /// The name or title of the torrent.
+    pub name: String,
+
+    /// The hash of the torrent, used in magnet links.
+    pub info_hash: String,
+
+    /// The number of leechers for the torrent as a string.
+    pub leechers: String,
+
+    /// The number of seeders for the torrent as a string.
+    pub seeders: String,
+
+    /// The number of files included in the torrent.
+    pub num_files: String,
+
+    /// The size of the torrent in bytes, represented as a string.
+    pub size: String,
+
+    /// The username of the uploader who shared the torrent.
+    pub username: String,
+
+    /// The date when the torrent was added.
+    pub added: String,
+
+    /// The status of the torrent (e.g., active, inactive).
+    pub status: String,
+
+    /// The category of the torrent (e.g., movies, games, software).
+    pub category: String,
+
+    /// The IMDb ID associated with the torrent, if available.
+    pub imdb: String,
 }

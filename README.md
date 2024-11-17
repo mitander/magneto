@@ -20,19 +20,23 @@ custom providers.
 ### Creating a `Magneto` instance and searching
 
 ```rust
-use magneto::{Magneto, SearchRequest};
+use magneto::{Category, Magneto, SearchRequest};
 
 #[tokio::main]
 async fn main() {
     let magneto = Magneto::new();
 
-    let request = SearchRequest::new("Ubuntu", None);
+    let request = SearchRequest::new("Ubuntu", Some(vec![Category::Software]));
     match magneto.search(request).await {
         Ok(results) => {
             for torrent in results {
                 println!(
-                    "found: {} (seeders: {}, peers: {})",
-                    torrent.name, torrent.seeders, torrent.peers
+                    "found: {} from {} with magnet link {} (seeders: {}, peers: {})",
+                    torrent.name,
+                    torrent.provider,
+                    torrent.magnet_link,
+                    torrent.seeders,
+                    torrent.peers,
                 );
             }
         }
