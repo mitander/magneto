@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use log::debug;
 use reqwest::{Client, Request};
-use url::Url;
 
 use crate::{errors::ClientError, SearchRequest, Torrent};
 
