@@ -62,10 +62,10 @@
 //!         vec![Box::new(Knaben::new()), Box::new(PirateBay::new())];
 //!     let _magneto = Magneto::with_providers(providers);
 //!
-//!     // Or use add_provider() to add to list of active providers
-//!     let mut magneto = Magneto::default(); // no providers
-//!     magneto.add_provider(Box::new(Knaben::new()));
-//!     magneto.add_provider(Box::new(PirateBay::new()));
+//!     // Or add new providers like this
+//!     let magneto = Magneto::default()
+//!         .add_provider(Box::new(Knaben::new()))
+//!         .add_provider(Box::new(PirateBay::new()));
 //! }
 //! ```
 //!
@@ -104,8 +104,7 @@
 //! #[tokio::main]
 //! async fn main() {
 //!     let custom_provider = CustomProvider::new();
-//!     let mut magneto = Magneto::new();
-//!     magneto.add_provider(Box::new(custom_provider));
+//!     let magneto = Magneto::new().add_provider(Box::new(custom_provider));
 //! }
 //! ```
 
@@ -293,7 +292,7 @@ impl<'a> SearchRequest<'a> {
 /// specific providers, and retrieving results in a unified format.
 #[derive(Default)]
 pub struct Magneto {
-    active_providers: Vec<Box<dyn SearchProvider>>,
+    pub active_providers: Vec<Box<dyn SearchProvider>>,
 }
 
 impl Magneto {
@@ -321,6 +320,18 @@ impl Magneto {
     ///
     /// # Returns
     /// - A new `Magneto` instance with the specified providers.
+    ///
+    /// # Example
+    /// ```rust
+    /// use magneto::{search_providers::{PirateBay, Knaben, SearchProvider}, Magneto};
+    ///
+    /// let providers = vec![
+    ///     Box::new(PirateBay::new()) as Box<dyn SearchProvider>,
+    ///     Box::new(Knaben::new()) as Box<dyn SearchProvider>,
+    /// ];
+    /// let magneto = Magneto::with_providers(providers);
+    /// assert_eq!(magneto.active_providers.len(), 2);
+    /// ```
     pub fn with_providers(providers: Vec<Box<dyn SearchProvider>>) -> Self {
         Self {
             active_providers: providers,
@@ -329,12 +340,31 @@ impl Magneto {
 
     /// Adds a provider to the list of active providers.
     ///
+    /// This method consumes the current `Magneto` instance and returns a new instance
+    /// with the added provider. If a provider with the same ID already exists, it will
+    /// not be added again.
+    ///
     /// # Parameters
     /// - `provider`: A provider implementing the `SearchProvider` trait.
     ///
+    /// # Returns
+    /// - A new `Magneto` instance with the updated list of providers.
+    ///
     /// # Notes
-    /// If a provider with the same ID already exists, it will not be added again.
-    pub fn add_provider(&mut self, provider: Box<dyn SearchProvider>) {
+    /// The uniqueness of providers is determined by their `id()` method.
+    ///
+    /// # Example
+    /// ```rust
+    /// use magneto::{search_providers::{PirateBay, Knaben, SearchProvider}, Magneto};
+    ///
+    /// let magneto = Magneto::with_providers(vec![])
+    ///     .add_provider(Box::new(PirateBay::new()))
+    ///     .add_provider(Box::new(Knaben::new()))
+    ///     .add_provider(Box::new(PirateBay::new())); // This duplicate will not be added
+    ///
+    /// assert_eq!(magneto.active_providers.len(), 2);
+    /// ```
+    pub fn add_provider(mut self, provider: Box<dyn SearchProvider>) -> Self {
         let provider_id = provider.id();
 
         if self
@@ -346,10 +376,11 @@ impl Magneto {
                 "provider '{}' already exists, skipping addition",
                 provider_id
             );
-            return;
+            return self;
         }
 
         self.active_providers.push(provider);
+        self
     }
 
     /// Executes a search query across all active providers.
@@ -363,6 +394,39 @@ impl Magneto {
     ///
     /// # Notes
     /// This method queries each provider in sequence and aggregates the results.
+    ///
+    /// # Example
+    /// ```rust
+    /// use magneto::search_providers::{PirateBay, Knaben};
+    /// use magneto::{Category, Magneto, SearchRequest, ClientError};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), ClientError> {
+    ///     // Initialize Magneto with some providers
+    ///     let magneto = Magneto::with_providers(vec![
+    ///         Box::new(PirateBay::new()),
+    ///         Box::new(Knaben::new()),
+    ///     ]);
+    ///
+    ///     // Create a search request
+    ///     let search_request = SearchRequest::new("Ubuntu").add_category(Category::Software);
+    ///
+    ///     // Execute the search
+    ///     match magneto.search(search_request).await {
+    ///         Ok(torrents) => {
+    ///             println!("Found {} torrents:", torrents.len());
+    ///             for torrent in torrents {
+    ///                 println!("{:?}", torrent);
+    ///             }
+    ///         }
+    ///         Err(e) => {
+    ///             eprintln!("Search failed: {:?}", e);
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
         let client = Client::new();
         let mut results = Vec::new();

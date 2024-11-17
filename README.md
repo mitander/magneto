@@ -64,10 +64,10 @@ async fn main() {
         vec![Box::new(Knaben::new()), Box::new(PirateBay::new())];
     let _magneto = Magneto::with_providers(providers);
 
-    // Or use add_provider() to add to list of active providers
-    let mut magneto = Magneto::default(); // no providers
-    magneto.add_provider(Box::new(Knaben::new()));
-    magneto.add_provider(Box::new(PirateBay::new()));
+    // Or add new providers like this
+    let magneto = Magneto::default()
+        .add_provider(Box::new(Knaben::new()))
+        .add_provider(Box::new(PirateBay::new()));
 }
 ```
 
@@ -106,8 +106,7 @@ impl SearchProvider for CustomProvider {
 #[tokio::main]
 async fn main() {
     let custom_provider = CustomProvider::new();
-    let mut magneto = Magneto::new();
-    magneto.add_provider(Box::new(custom_provider));
+    let magneto = Magneto::new().add_provider(Box::new(custom_provider));
 }
 ```
 
