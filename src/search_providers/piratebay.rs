@@ -1,32 +1,68 @@
+//! # Piratebay (apibay.org) Search Provider
+//!
+//! The `PirateBay` implementation of the `SearchProvider` trait allows querying
+//! Piratebay API for torrent metadata. This provider formats queries,
+//! sends them to Piratebay API, and parses the resulting JSON response into
+//! a unified `Torrent` structure.
+
 use async_trait::async_trait;
+use reqwest::{Client, Request};
 use serde::Deserialize;
 
 use crate::{errors::ClientError, SearchProvider, SearchRequest, Torrent};
 
-use reqwest::{Client, Request};
-
+/// Represents a single entry in the Pirate Bay API response.
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct ResponseEntry {
+    /// The unique identifier for the torrent.
     pub id: String,
+
+    /// The name or title of the torrent.
     pub name: String,
+
+    /// The hash of the torrent, used in magnet links.
     pub info_hash: String,
+
+    /// The number of leechers for the torrent as a string.
     pub leechers: String,
+
+    /// The number of seeders for the torrent as a string.
     pub seeders: String,
+
+    /// The number of files included in the torrent.
     pub num_files: String,
+
+    /// The size of the torrent in bytes, represented as a string.
     pub size: String,
+
+    /// The username of the uploader who shared the torrent.
     pub username: String,
+
+    /// The date when the torrent was added.
     pub added: String,
+
+    /// The status of the torrent (e.g., active, inactive).
     pub status: String,
+
+    /// The category of the torrent (e.g., movies, games, software).
     pub category: String,
+
+    /// The IMDb ID associated with the torrent, if available.
     pub imdb: String,
 }
 
+/// The `PirateBay` provider handles querying and parsing data from the Pirate Bay API.
 pub struct PirateBay {
+    /// The base URL for the Pirate Bay API.
     api_url: String,
 }
 
 impl PirateBay {
+    /// Creates a new instance of the `PirateBay` provider.
+    ///
+    /// # Returns
+    /// - `PirateBay`: A new provider instance with the default API URL.
     pub fn new() -> Self {
         Self {
             api_url: "https://apibay.org/q.php?".to_string(),
@@ -35,6 +71,7 @@ impl PirateBay {
 }
 
 impl Default for PirateBay {
+    /// Provides a default implementation for `PirateBay`, returning an instance with the default API URL.
     fn default() -> Self {
         PirateBay::new()
     }
@@ -42,6 +79,15 @@ impl Default for PirateBay {
 
 #[async_trait]
 impl SearchProvider for PirateBay {
+    /// Builds the request to query the Pirate Bay API.
+    ///
+    /// # Parameters
+    /// - `client`: The HTTP client used to build the request.
+    /// - `request`: The `SearchRequest` containing query parameters.
+    ///
+    /// # Returns
+    /// - `Ok(Request)`: The constructed HTTP request.
+    /// - `Err(ClientError)`: An error if request building fails.
     fn build_request(
         &self,
         client: &Client,
@@ -59,9 +105,17 @@ impl SearchProvider for PirateBay {
             })
     }
 
+    /// Parses the response from the Pirate Bay API into a list of torrents.
+    ///
+    /// # Parameters
+    /// - `response`: The raw response body as a string.
+    ///
+    /// # Returns
+    /// - `Ok(Vec<Torrent>)`: A list of parsed torrent metadata.
+    /// - `Err(ClientError)`: An error if parsing fails.
     fn parse_response(&self, response: &str) -> Result<Vec<Torrent>, ClientError> {
-        let response: Vec<ResponseEntry> = serde_json::from_str(response)
-            .map_err(|e| ClientError::DataParseError { source: e.into() })?;
+        let response: Vec<ResponseEntry> =
+            serde_json::from_str(response).map_err(|e| ClientError::DataParseError(e.into()))?;
 
         let torrents = response
             .iter()
@@ -82,20 +136,12 @@ impl SearchProvider for PirateBay {
 
         Ok(torrents)
     }
+
+    /// Returns the unique identifier for this provider.
+    ///
+    /// # Returns
+    /// - `String`: The provider's API URL as its unique identifier.
     fn id(&self) -> String {
         self.api_url.clone()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_parse() {
-        todo!();
-    }
-
-    #[test]
-    fn test_parse_empty() {
-        todo!();
     }
 }
