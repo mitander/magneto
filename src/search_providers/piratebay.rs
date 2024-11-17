@@ -54,7 +54,6 @@ impl SearchProvider for PirateBay {
     ) -> Result<Request, ClientError> {
         let categories: Vec<String> = request
             .categories
-            .unwrap_or_default()
             .into_iter()
             .map(|category| match category {
                 Category::Movies => "201,202,207,209,211".to_string(),

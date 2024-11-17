@@ -1,14 +1,14 @@
 use log::info;
-use magneto::{Magneto, SearchRequest};
+use magneto::{Category, Magneto, SearchRequest};
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
 
     let magneto = Magneto::new();
-    let req = SearchRequest::new("Ubuntu", None);
+    let request = SearchRequest::new("Ubuntu").add_category(Category::Software);
 
-    match magneto.search(req).await {
+    match magneto.search(request).await {
         Ok(results) => {
             for res in results {
                 info!(

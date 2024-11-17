@@ -146,20 +146,29 @@ impl KnabenRequest {
     /// # Returns
     /// - `KnabenRequest`: A request formatted for the Knaben API.
     pub fn from_search_request(request: SearchRequest<'_>) -> Self {
-        let categories: Option<Vec<u32>> = request.categories.map(|categories| {
-            categories
-                .into_iter()
-                .map(|category| match category {
-                    Category::Movies => 3000000,
-                    Category::TvShows => 2000000,
-                    Category::Games => 4001000,
-                    Category::Software => 4002000,
-                    Category::Audio => 1000000,
-                    Category::Anime => 6000000,
-                    Category::Xxx => 5000000,
-                })
-                .collect()
-        });
+        let mut hide_xxx = true;
+        let categories: Option<Vec<u32>> = if request.categories.is_empty() {
+            None
+        } else {
+            Some(
+                request
+                    .categories
+                    .iter()
+                    .map(|category| match category {
+                        Category::Movies => 3000000,
+                        Category::TvShows => 2000000,
+                        Category::Games => 4001000,
+                        Category::Software => 4002000,
+                        Category::Audio => 1000000,
+                        Category::Anime => 6000000,
+                        Category::Xxx => {
+                            hide_xxx = false;
+                            5000000
+                        }
+                    })
+                    .collect(),
+            )
+        };
 
         Self {
             search_type: "score".to_string(),
@@ -170,7 +179,7 @@ impl KnabenRequest {
             categories,
             size: 50,
             hide_unsafe: true,
-            hide_xxx: request.hide_xxx,
+            hide_xxx,
             seconds_since_last_seen: 86400, // 24hr
         }
     }

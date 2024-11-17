@@ -26,7 +26,11 @@ use magneto::{Category, Magneto, SearchRequest};
 async fn main() {
     let magneto = Magneto::new();
 
-    let request = SearchRequest::new("Ubuntu", Some(vec![Category::Software]));
+    // You can add search categories to your request, by default all categories are searched.
+    let request = SearchRequest::new("Ubuntu")
+        .add_category(Category::Software)
+        .add_categories(vec![Category::Audio, Category::Movies]);
+
     match magneto.search(request).await {
         Ok(results) => {
             for torrent in results {

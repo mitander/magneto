@@ -24,7 +24,11 @@
 //! async fn main() {
 //!     let magneto = Magneto::new();
 //!
-//!     let request = SearchRequest::new("Ubuntu", Some(vec![Category::Software]));
+//!     // You can add search categories to your request, by default all categories are searched.
+//!     let request = SearchRequest::new("Ubuntu")
+//!         .add_category(Category::Software)
+//!         .add_categories(vec![Category::Audio, Category::Movies]);
+//!
 //!     match magneto.search(request).await {
 //!         Ok(results) => {
 //!             for torrent in results {
@@ -140,7 +144,7 @@ pub struct Torrent {
 }
 
 /// Enum specifying the different categories available for torrents.
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, Eq, PartialEq)]
 pub enum Category {
     /// Represents the category for movies.
     Movies,
@@ -182,7 +186,6 @@ impl fmt::Display for OrderBy {
         }
     }
 }
-
 /// Represents a search request to be sent to torrent providers.
 #[derive(Serialize, Debug, Clone)]
 pub struct SearchRequest<'a> {
@@ -195,42 +198,91 @@ pub struct SearchRequest<'a> {
     /// The order by which results are sorted.
     pub order_by: OrderBy,
 
-    /// Optional categories to filter results by.
-    pub categories: Option<Vec<Category>>,
+    /// Categories to filter results by. Starts as an empty list by default.
+    pub categories: Vec<Category>,
 
     /// The number of results to retrieve.
     pub number_of_results: u32,
-
-    /// Whether to hide adult content.
-    pub hide_xxx: bool,
 }
 
 impl<'a> SearchRequest<'a> {
-    /// Creates a new `SearchRequest` with the specified query and optional categories.
+    /// Creates a new `SearchRequest` with the specified query.
     ///
-    /// Remaining fields gets the following default values:
+    /// Remaining fields get the following default values:
     /// - `query_imdb_id`: `false`
     /// - `order_by`: `OrderBy::Seeders`
+    /// - `categories`: An empty `Vec<Category>`
     /// - `number_of_results`: `50`
-    /// - `hide_xxx`: `true`
-    ///
-    /// You can customize these fields by struct initialization.
     ///
     /// # Parameters
     /// - `query`: The search term or phrase.
-    /// - `categories`: An optional list of `Category` to filter results.
     ///
     /// # Returns
     /// - A new `SearchRequest` instance.
-    pub fn new(query: &'a str, categories: Option<Vec<Category>>) -> Self {
+    ///
+    /// # Example
+    /// ```rust
+    /// use magneto::SearchRequest;
+    ///
+    /// let request = SearchRequest::new("example query");
+    /// assert_eq!(request.categories, vec![]);
+    /// ```
+    pub fn new(query: &'a str) -> Self {
         Self {
             query,
             query_imdb_id: false,
             order_by: OrderBy::Seeders,
-            categories,
+            categories: vec![],
             number_of_results: 50,
-            hide_xxx: true,
         }
+    }
+
+    /// Adds a single category to the `SearchRequest`.
+    ///
+    /// This method consumes the current instance and returns a new `SearchRequest`
+    /// with the added category.
+    ///
+    /// # Parameters
+    /// - `category`: The `Category` to add.
+    ///
+    /// # Returns
+    /// - `Self`: A new `SearchRequest` instance with the updated category.
+    ///
+    /// # Example
+    /// ```rust
+    /// use magneto::{Category, SearchRequest};
+    ///
+    /// let request = SearchRequest::new("example query")
+    ///     .add_category(Category::Movies);
+    /// assert_eq!(request.categories, vec![Category::Movies]);
+    /// ```
+    pub fn add_category(mut self, category: Category) -> Self {
+        self.categories.push(category);
+        self
+    }
+
+    /// Adds multiple categories to the `SearchRequest`.
+    ///
+    /// This method consumes the current instance and returns a new `SearchRequest`
+    /// with the added categories.
+    ///
+    /// # Parameters
+    /// - `categories`: A vector of `Category` values to add.
+    ///
+    /// # Returns
+    /// - `Self`: A new `SearchRequest` instance with the updated categories.
+    ///
+    /// # Example
+    /// ```rust
+    /// use magneto::{Category, SearchRequest};
+    ///
+    /// let request = SearchRequest::new("example query")
+    ///     .add_categories(vec![Category::Movies, Category::Anime]);
+    /// assert_eq!(request.categories, vec![Category::Movies, Category::Anime]);
+    /// ```
+    pub fn add_categories(mut self, categories: Vec<Category>) -> Self {
+        self.categories.extend(categories);
+        self
     }
 }
 
