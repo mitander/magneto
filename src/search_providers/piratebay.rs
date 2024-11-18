@@ -27,6 +27,20 @@ impl PirateBay {
             api_url: "https://apibay.org/q.php".to_string(),
         }
     }
+
+    /// Creates a new instance of the `PirateBay` provider with a custom API URL.
+    /// This can be useful if the provider changes url or you want to use a proxy server.
+    ///
+    /// # Parameters
+    /// - `url`: The custom API URL to use.
+    ///
+    /// # Returns
+    /// - `PirateBay`: A new provider instance with the specified API URL.
+    pub fn with_url(url: impl Into<String>) -> Self {
+        Self {
+            api_url: url.into(),
+        }
+    }
 }
 
 impl Default for PirateBay {
@@ -273,11 +287,10 @@ mod tests {
         let result = provider.parse_response(invalid_response_body);
 
         assert!(result.is_err());
-        if let ClientError::DataParseError(e) = result.unwrap_err() {
-            assert!(e.to_string().contains("expected ident at line 1 column 2"));
-        } else {
-            panic!("Expected ClientError::DataParseError");
-        }
+        assert!(
+            matches!(result.unwrap_err(), ClientError::DataParseError(_)),
+            "Expected ClientError::DataParseError"
+        );
     }
 
     /// Tests handling of responses with invalid entries.

@@ -26,6 +26,20 @@ impl Knaben {
             api_url: "https://api.knaben.eu/v1".to_string(),
         }
     }
+
+    /// Creates a new instance of the `Knaben` provider with a custom API URL.
+    /// This can be useful if the provider changes url or you want to use a proxy server.
+    ///
+    /// # Parameters
+    /// - `url`: The custom API URL to use.
+    ///
+    /// # Returns
+    /// - `Knaben`: A new provider instance with the specified API URL.
+    pub fn with_url(url: impl Into<String>) -> Self {
+        Self {
+            api_url: url.into(),
+        }
+    }
 }
 
 impl Default for Knaben {
@@ -88,7 +102,7 @@ impl SearchProvider for Knaben {
                     seeders: entry.seeders,
                     peers: entry.peers,
                     size_bytes: entry.bytes,
-                    provider: format!("{} (via knaben)", entry.tracker),
+                    provider: format!("{} (via Knaben)", entry.tracker),
                 })
             })
             .collect();
@@ -129,7 +143,7 @@ struct KnabenRequest {
     /// The number of results to retrieve.
     size: u32,
 
-    /// Whether to hide very old results and results that has a high potential virus score.
+    /// Whether to hide unsafe or potentially malicious results.
     hide_unsafe: bool,
 
     /// Whether to hide adult content.
@@ -138,11 +152,12 @@ struct KnabenRequest {
     /// Time (in seconds) since the last seen torrent to filter results.
     seconds_since_last_seen: u32,
 }
+
 impl KnabenRequest {
     /// Converts a `SearchRequest` into a `KnabenRequest`.
     ///
     /// # Parameters
-    /// - `req`: The `SearchRequest` to convert.
+    /// - `request`: The `SearchRequest` to convert.
     ///
     /// # Returns
     /// - `KnabenRequest`: A request formatted for the Knaben API.
@@ -181,7 +196,7 @@ impl KnabenRequest {
             size: 50,
             hide_unsafe: true,
             hide_xxx,
-            seconds_since_last_seen: 86400, // 24hr
+            seconds_since_last_seen: 86400, // 24 hours
         }
     }
 }
@@ -225,4 +240,179 @@ pub struct ResponseEntry {
 
     /// Categories associated with the torrent.
     category_id: Vec<u32>,
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use mockito::Server;
+    use serde_json::{json, Value};
+
+    /// Sets up a mock `Knaben` provider using a mock server.
+    async fn setup_mock_provider() -> Knaben {
+        Knaben {
+            api_url: Server::new_async().await.url(),
+        }
+    }
+
+    /// Tests building a request with a valid query and categories.
+    ///
+    /// Ensures that the request contains the appropriate JSON body
+    /// with the query and categories serialized correctly.
+    #[tokio::test]
+    async fn test_build_request_with_categories() {
+        let provider = setup_mock_provider().await;
+        let client = Client::new();
+
+        let search_request = SearchRequest::new("ubuntu").add_category(Category::Movies);
+        let request = provider.build_request(&client, search_request);
+
+        assert!(request.is_ok());
+        let request = request.unwrap();
+        assert_eq!(request.method(), "POST");
+        assert_eq!(
+            request.headers().get(CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
+
+        let body: serde_json::Value =
+            serde_json::from_slice(request.body().unwrap().as_bytes().unwrap())
+                .expect("Body should be valid JSON");
+        assert_eq!(body["query"], "ubuntu");
+        assert_eq!(body["categories"], json![[3000000]]);
+    }
+
+    /// Tests building a request with a valid query but no categories.
+    ///
+    /// Ensures that the request contains the query but omits the `categories` field in the body.
+    #[tokio::test]
+    async fn test_build_request_without_categories() {
+        let provider = setup_mock_provider().await;
+        let client = Client::new();
+
+        let search_request = SearchRequest::new("ubuntu");
+        let request = provider.build_request(&client, search_request);
+
+        assert!(request.is_ok());
+        let request = request.unwrap();
+        assert_eq!(request.method(), "POST");
+
+        let body: serde_json::Value =
+            serde_json::from_slice(request.body().unwrap().as_bytes().unwrap())
+                .expect("Body should be valid JSON");
+        assert_eq!(body["query"], "ubuntu");
+        assert_eq!(body.get("categories").unwrap(), &Value::Null);
+    }
+
+    /// Tests parsing a valid API response into a list of torrents.
+    ///
+    /// Ensures that the response is correctly parsed into a list of `Torrent` structs
+    /// with all expected fields populated.
+    #[tokio::test]
+    async fn test_parse_response_valid() {
+        let provider = setup_mock_provider().await;
+
+        let response_body = r#"
+        {
+            "hits": [
+                {
+                    "id": "1",
+                    "title": "Ubuntu ISO",
+                    "hash": "abc123",
+                    "peers": 10,
+                    "seeders": 20,
+                    "bytes": 2048,
+                    "date": "2024-01-01",
+                    "tracker": "knaben",
+                    "categoryId": [3000000]
+                }
+            ]
+        }
+        "#;
+
+        let result = provider.parse_response(response_body);
+
+        assert!(result.is_ok());
+        let torrents = result.unwrap();
+        assert_eq!(torrents.len(), 1);
+
+        let torrent = &torrents[0];
+        assert_eq!(torrent.name, "Ubuntu ISO");
+        assert_eq!(torrent.magnet_link, "magnet:?xt=urn:btih:abc123");
+        assert_eq!(torrent.seeders, 20);
+        assert_eq!(torrent.peers, 10);
+        assert_eq!(torrent.size_bytes, 2048);
+        assert_eq!(torrent.provider, "knaben (via Knaben)");
+    }
+
+    /// Tests parsing an API response with invalid JSON.
+    ///
+    /// Ensures that invalid JSON results in a `DataParseError`.
+    #[tokio::test]
+    async fn test_parse_response_invalid_json() {
+        let provider = setup_mock_provider().await;
+
+        let invalid_response_body = r#"not a valid json"#;
+
+        let result = provider.parse_response(invalid_response_body);
+
+        assert!(result.is_err());
+        assert!(
+            matches!(result.unwrap_err(), ClientError::DataParseError(_)),
+            "Expected ClientError::DataParseError"
+        );
+    }
+
+    /// Tests parsing an API response with invalid entries.
+    ///
+    /// Ensures that entries with missing or invalid fields (e.g., missing hash)
+    /// are excluded from the results.
+    #[tokio::test]
+    async fn test_parse_response_invalid_entries() {
+        let provider = setup_mock_provider().await;
+
+        let response_body = r#"
+        {
+            "hits": [
+                {
+                    "id": "1",
+                    "title": "Ubuntu ISO",
+                    "hash": null,
+                    "peers": 10,
+                    "seeders": 20,
+                    "bytes": 2048,
+                    "date": "2024-01-01",
+                    "tracker": "knaben",
+                    "categoryId": [3000000]
+                }
+            ]
+        }
+        "#;
+
+        let result = provider.parse_response(response_body);
+
+        assert!(result.is_ok());
+        let torrents = result.unwrap();
+        assert!(
+            torrents.is_empty(),
+            "Expected empty results due to invalid entries"
+        );
+    }
+
+    /// Tests parsing an API response with no entries.
+    ///
+    /// Ensures that an empty `hits` field results in an empty list of torrents.
+    #[tokio::test]
+    async fn test_parse_response_empty() {
+        let provider = setup_mock_provider().await;
+
+        let response_body = r#"{ "hits": [] }"#;
+
+        let result = provider.parse_response(response_body);
+
+        assert!(result.is_ok());
+        let torrents = result.unwrap();
+        assert!(torrents.is_empty(), "Expected empty results");
+    }
 }
