@@ -81,14 +81,15 @@ impl SearchProvider for Knaben {
         let torrents = response
             .entries
             .iter()
-            .filter(|entry| entry.hash.is_some() && entry.peers != 0)
-            .map(|entry| Torrent {
-                name: entry.title.to_owned(),
-                magnet_link: format!("magnet:?xt=urn:btih:{}", entry.hash.to_owned().unwrap()),
-                seeders: entry.seeders,
-                peers: entry.peers,
-                size_bytes: entry.bytes,
-                provider: format!("{} (via knaben)", entry.tracker),
+            .filter_map(|entry| {
+                entry.hash.as_ref().map(|hash| Torrent {
+                    name: entry.title.to_owned(),
+                    magnet_link: format!("magnet:?xt=urn:btih:{}", hash),
+                    seeders: entry.seeders,
+                    peers: entry.peers,
+                    size_bytes: entry.bytes,
+                    provider: format!("{} (via knaben)", entry.tracker),
+                })
             })
             .collect();
 
