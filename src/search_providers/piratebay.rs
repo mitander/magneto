@@ -66,11 +66,16 @@ impl SearchProvider for PirateBay {
             })
             .collect();
 
-        let query = &[("q", request.query), ("cat", &categories.join(","))];
+        let categories_string = categories.join(",");
+
+        let mut query = vec![("q", request.query)];
+        if !categories.is_empty() {
+            query.push(("cat", &categories_string));
+        };
 
         client
             .get(self.api_url.clone())
-            .query(query)
+            .query(&query)
             .build()
             .map_err(|e| ClientError::RequestBuildError {
                 source: e.into(),
@@ -164,4 +169,188 @@ pub struct ResponseEntry {
 
     /// The IMDb ID associated with the torrent, if available.
     pub imdb: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockito::Server;
+
+    /// Sets up a mock PirateBay provider using a mock server.
+    async fn setup_mock_provider() -> PirateBay {
+        PirateBay {
+            api_url: Server::new_async().await.url(),
+        }
+    }
+
+    /// Tests building a request with a valid query and a category.
+    ///
+    /// Ensures that the request includes the `q` parameter for the query
+    /// and the `cat` parameter for the category.
+    #[tokio::test]
+    async fn test_build_request() {
+        let provider = setup_mock_provider().await;
+        let client = Client::new();
+
+        let search_request = SearchRequest::new("ubuntu").add_category(Category::Software);
+        let request = provider.build_request(&client, search_request);
+
+        assert!(request.is_ok());
+        let request = request.unwrap();
+        assert_eq!(request.method(), "GET");
+        assert!(request.url().as_str().contains("q=ubuntu"));
+        assert!(request.url().as_str().contains("cat=300"));
+    }
+
+    /// Tests building a request with a valid query but no category.
+    ///
+    /// Ensures that the request includes the `q` parameter for the query
+    /// but does not include a `cat` parameter.
+    #[tokio::test]
+    async fn test_build_request_no_category() {
+        let provider = setup_mock_provider().await;
+        let client = Client::new();
+
+        let search_request = SearchRequest::new("ubuntu");
+        let request = provider.build_request(&client, search_request);
+
+        assert!(request.is_ok());
+        let request = request.unwrap();
+        assert!(request.url().as_str().contains("q=ubuntu"));
+        assert!(!request.url().as_str().contains("cat="));
+    }
+
+    /// Tests parsing a valid API response into a list of torrents.
+    ///
+    /// Ensures that the response is correctly parsed into a `Torrent` struct
+    /// with all expected fields populated.
+    #[tokio::test]
+    async fn test_parse_response() {
+        let provider = setup_mock_provider().await;
+
+        let response_body = r#"
+        [
+            {
+                "id": "1",
+                "name": "Ubuntu ISO",
+                "info_hash": "abc123",
+                "leechers": "10",
+                "seeders": "20",
+                "num_files": "5",
+                "size": "2048",
+                "username": "user123",
+                "added": "today",
+                "status": "active",
+                "category": "software",
+                "imdb": ""
+            }
+        ]
+        "#;
+
+        let result = provider.parse_response(response_body);
+
+        assert!(result.is_ok());
+        let torrents = result.unwrap();
+        assert_eq!(torrents.len(), 1);
+        let torrent = &torrents[0];
+        assert_eq!(torrent.name, "Ubuntu ISO");
+        assert_eq!(torrent.magnet_link, "magnet:?xt=urn:btih:abc123");
+        assert_eq!(torrent.seeders, 20);
+        assert_eq!(torrent.peers, 10);
+        assert_eq!(torrent.size_bytes, 2048);
+        assert_eq!(torrent.provider, "piratebay");
+    }
+
+    /// Tests handling of invalid JSON responses from the API.
+    ///
+    /// Ensures that an invalid JSON string results in a `DataParseError`.
+    #[tokio::test]
+    async fn test_parse_response_invalid_json() {
+        let provider = setup_mock_provider().await;
+
+        let invalid_response_body = r#"not a valid json"#;
+
+        let result = provider.parse_response(invalid_response_body);
+
+        assert!(result.is_err());
+        if let ClientError::DataParseError(e) = result.unwrap_err() {
+            assert!(e.to_string().contains("expected ident at line 1 column 2"));
+        } else {
+            panic!("Expected ClientError::DataParseError");
+        }
+    }
+
+    /// Tests handling of responses with invalid entries.
+    ///
+    /// Ensures that entries with invalid field values, such as unparsable
+    /// leechers, are excluded from the results.
+    #[tokio::test]
+    async fn test_parse_response_invalid_entry() {
+        let provider = setup_mock_provider().await;
+
+        let response_body = r#"
+        [
+            {
+                "id": "1",
+                "name": "Invalid Torrent",
+                "info_hash": "abc123",
+                "leechers": "invalid",
+                "seeders": "20",
+                "num_files": "5",
+                "size": "2048",
+                "username": "user123",
+                "added": "today",
+                "status": "active",
+                "category": "software",
+                "imdb": ""
+            }
+        ]
+        "#;
+
+        let result = provider.parse_response(response_body);
+
+        assert!(result.is_ok());
+        let torrents = result.unwrap();
+        assert!(
+            torrents.is_empty(),
+            "Expected empty results due to invalid leechers"
+        );
+    }
+
+    /// Tests handling of an empty API response.
+    ///
+    /// Ensures that entries with default or invalid field values are excluded
+    /// from the results.
+    #[tokio::test]
+    async fn test_parse_empty_response() {
+        let provider = setup_mock_provider().await;
+
+        let response_body = r#"
+        [
+            {
+                "id": "0",
+                "name": "No results returned",
+                "info_hash": "0000000000000000000000000000000000000000",
+                "leechers": "0",
+                "seeders": "0",
+                "num_files": "0",
+                "size": "0",
+                "username": "",
+                "added": "",
+                "status": "",
+                "category": "",
+                "imdb": ""
+            }
+        ]
+        "#;
+
+        let result = provider.parse_response(response_body);
+
+        assert!(result.is_ok());
+        let torrents = result.unwrap();
+        assert!(
+            torrents.is_empty(),
+            "Expected empty results due to invalid entry"
+        );
+    }
 }
