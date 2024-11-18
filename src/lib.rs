@@ -12,6 +12,7 @@
 //! ## Supported providers
 //! - PirateBay (apibay.org)
 //! - Knaben (knaben.eu)
+//! - YTS (yts.mx)
 //!
 //! ## Examples
 //!
@@ -60,7 +61,7 @@
 //!
 //! ```rust
 //! use magneto::{
-//!     search_providers::{Knaben, PirateBay, SearchProvider},
+//!     search_providers::{Knaben, PirateBay, SearchProvider, Yts},
 //!     Magneto,
 //! };
 //!
@@ -74,7 +75,7 @@
 //!     // Or add new providers like this
 //!     let magneto = Magneto::default()
 //!         .add_provider(Box::new(Knaben::new()))
-//!         .add_provider(Box::new(PirateBay::new()));
+//!         .add_provider(Box::new(Yts::new()));
 //! }
 //! ```
 //!
@@ -120,7 +121,7 @@ pub use reqwest::{Client, Request};
 use serde::{Deserialize, Serialize};
 
 pub use errors::ClientError;
-pub use search_providers::{Knaben, PirateBay, SearchProvider};
+pub use search_providers::{Knaben, PirateBay, SearchProvider, Yts};
 
 /// Represents metadata for a torrent returned by a search provider.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -314,12 +315,16 @@ impl Magneto {
     /// The default providers include:
     /// - `Knaben`
     /// - `PirateBay`
+    /// - `Yts`
     ///
     /// # Returns
     /// - A new `Magneto` instance with default providers.
     pub fn new() -> Self {
-        let providers: Vec<Box<dyn SearchProvider>> =
-            vec![Box::new(Knaben::new()), Box::new(PirateBay::new())];
+        let providers: Vec<Box<dyn SearchProvider>> = vec![
+            Box::new(Knaben::new()),
+            Box::new(PirateBay::new()),
+            Box::new(Yts::new()),
+        ];
 
         Self {
             active_providers: providers,
@@ -369,11 +374,11 @@ impl Magneto {
     ///
     /// # Examples
     /// ```
-    /// use magneto::{search_providers::Knaben, Magneto};
+    /// use magneto::{search_providers::Yts, Magneto};
     ///
     /// let magneto = Magneto::default()
-    ///     .add_provider(Box::new(Knaben::new()))
-    ///     .add_provider(Box::new(Knaben::new()));
+    ///     .add_provider(Box::new(Yts::new()))
+    ///     .add_provider(Box::new(Yts::new()));
     ///
     /// // Duplicates are removed
     /// assert_eq!(magneto.active_providers.len(), 1);

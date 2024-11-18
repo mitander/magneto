@@ -6,9 +6,11 @@ use crate::{errors::ClientError, SearchRequest, Torrent};
 
 pub mod knaben;
 pub mod piratebay;
+pub mod yts;
 
 pub use knaben::Knaben;
 pub use piratebay::PirateBay;
+pub use yts::Yts;
 
 /// The `SearchProvider` trait defines the interface for implementing
 /// search providers to query and parse torrent metadata.
