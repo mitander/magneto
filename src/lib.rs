@@ -348,6 +348,11 @@ impl Magneto {
             }
         }
 
+        results.sort_by(|a, b| match req.order_by {
+            OrderBy::Seeders => b.seeders.cmp(&a.seeders),
+            OrderBy::Peers => b.peers.cmp(&a.peers),
+        });
+
         Ok(results)
     }
 }

@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use reqwest::{header::CONTENT_TYPE, Client, Request};
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::ClientError, Category, SearchProvider, SearchRequest, Torrent};
+use crate::{Category, ClientError, SearchProvider, SearchRequest, Torrent};
 
 /// The `Knaben` provider handles querying and parsing data from the Knaben API.
 pub struct Knaben {
