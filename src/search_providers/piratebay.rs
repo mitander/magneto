@@ -97,13 +97,19 @@ impl SearchProvider for PirateBay {
                     && entry.name != "No results returned"
                     && entry.info_hash != "0000000000000000000000000000000000000000"
             })
-            .map(|entry| Torrent {
-                name: entry.name.clone(),
-                magnet_link: format!("magnet:?xt=urn:btih:{}", entry.info_hash),
-                seeders: entry.seeders.parse().unwrap_or(0),
-                peers: entry.leechers.parse().unwrap_or(0),
-                size_bytes: entry.size.parse().unwrap_or(0),
-                provider: "piratebay".to_string(),
+            .filter_map(|entry| {
+                let seeders = entry.seeders.parse().ok()?;
+                let peers = entry.leechers.parse().ok()?;
+                let size_bytes = entry.size.parse().ok()?;
+
+                Some(Torrent {
+                    name: entry.name.clone(),
+                    magnet_link: format!("magnet:?xt=urn:btih:{}", entry.info_hash),
+                    seeders,
+                    peers,
+                    size_bytes,
+                    provider: "piratebay".to_string(),
+                })
             })
             .collect();
 
