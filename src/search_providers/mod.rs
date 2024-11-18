@@ -48,13 +48,13 @@ pub trait SearchProvider: Send + Sync {
         let response = client
             .execute(request)
             .await
-            .map_err(|e| ClientError::ResponseError { source: e.into() })?;
+            .map_err(|e| ClientError::ResponseError(e.into()))?;
 
         let response_status = response.status();
         let response_content = response
             .text()
             .await
-            .map_err(|e| ClientError::ResponseError { source: e.into() })?;
+            .map_err(|e| ClientError::ResponseError(e.into()))?;
 
         debug!(
             "client received {} response with {} bytes of body data",
@@ -65,7 +65,7 @@ pub trait SearchProvider: Send + Sync {
         if !response_status.is_success() {
             return Err(ClientError::ServerResponseError {
                 code: response_status,
-                content: Some(response_content.clone()),
+                content: response_content.clone(),
             });
         }
 
