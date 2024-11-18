@@ -177,17 +177,14 @@ mod tests {
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(
-                json!({
-                    "torrents": [
-                        {
-                            "name": "Ubuntu ISO",
-                            "magnet": "magnet:?xt=urn:btih:abc123",
-                            "seeders": 20,
-                            "peers": 10,
-                            "size": 2048
-                        }
-                    ]
-                })
+                json!([{
+                    "name": "Ubuntu ISO",
+                    "magnet_link": "magnet:?xt=urn:btih:abc123",
+                    "seeders": 20,
+                    "peers": 10,
+                    "size_bytes": 2048,
+                    "provider": server.url()
+                }])
                 .to_string(),
             )
             .create();
