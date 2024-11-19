@@ -27,7 +27,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-magneto = "0.2"
+magneto = "0.2.1"
 ```
 
 Then:
@@ -95,10 +95,13 @@ let request = SearchRequest {
 ### Add a custom provider
 
 ```rust
-use magneto::{ClientError, Magneto, SearchProvider, SearchRequest, Torrent, Client, Request};
+use magneto::{
+    async_trait, Client, ClientError, Magneto, Request, SearchProvider, SearchRequest, Torrent,
+};
 
 struct CustomProvider;
 
+#[async_trait]
 impl SearchProvider for CustomProvider {
     fn build_request(
         &self,

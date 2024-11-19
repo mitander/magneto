@@ -19,7 +19,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! magneto = "0.2"
+//! magneto = "0.2.1"
 //! ```
 //!
 //! Then:
@@ -87,10 +87,13 @@
 //! ### Add a custom provider
 //!
 //! ```no_run
-//! use magneto::{ClientError, Magneto, SearchProvider, SearchRequest, Torrent, Client, Request};
+//! use magneto::{
+//!     async_trait, Client, ClientError, Magneto, Request, SearchProvider, SearchRequest, Torrent,
+//! };
 //!
 //! struct CustomProvider;
 //!
+//! #[async_trait]
 //! impl SearchProvider for CustomProvider {
 //!     fn build_request(
 //!         &self,
@@ -127,6 +130,9 @@ use core::fmt;
 
 // Re-exports from reqwest
 pub use reqwest::{Client, Request};
+
+// Re-export async_trait;
+pub use async_trait::async_trait;
 
 use log::debug;
 use serde::{Deserialize, Serialize};
