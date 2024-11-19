@@ -1,8 +1,9 @@
-use magneto::{Category, Magneto, OrderBy, SearchRequest};
+use magneto::{Category, Knaben, Magneto, OrderBy, SearchRequest};
 
 #[tokio::main]
 async fn main() {
-    let magneto = Magneto::new();
+    // Only use Knaben provider
+    let magneto = Magneto::default().add_provider(Box::new(Knaben::new()));
 
     // You can add categories which your search are filtered by.
     let request = SearchRequest::new("Ubuntu")
@@ -12,7 +13,6 @@ async fn main() {
     // Or initialize the request like this for more customization.
     let _request = SearchRequest {
         query: "Debian",
-        query_imdb_id: false,
         order_by: OrderBy::Seeders,
         categories: vec![Category::Movies],
         number_of_results: 10,

@@ -5,102 +5,113 @@
 //! custom providers.
 //!
 //! ## Features
+//! - Fully async-powered using `reqwest` and `tokio`.
 //! - Query multiple torrent search providers simultaneously.
+//! - Retrieve torrent results in a unified format.
 //! - Add custom providers with minimal effort.
-//! - Retrieve results in a unified format with metadata like magnet link, seeders, peers, and size.
 //!
 //! ## Supported providers
-//! - PirateBay (apibay.org)
-//! - Knaben (knaben.eu)
-//! - YTS (yts.mx)
+//! - Knaben: A multi search archiver, acting as a cached proxy towards multiple different trackers.
+//! - PirateBay: The galaxy’s most resilient Public BitTorrent site.
+//! - YTS: A public torrent site specialising in HD movies of small size.
 //!
-//! ## Examples
+//! ## Usage
 //!
-//! ### Creating a `Magneto` instance and searching
+//! Add this to your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! magneto = "0.1"
+//! ```
+//!
+//! Then:
 //!
 //! ```rust
-//! use magneto::{Category, Magneto, SearchRequest, OrderBy};
+//! use magneto::{Magneto, SearchRequest};
 //!
 //! #[tokio::main]
 //! async fn main() {
 //!     let magneto = Magneto::new();
 //!
-//!     // You can add categories which your search are filtered by.
-//!     let request = SearchRequest::new("Ubuntu")
-//!         .add_category(Category::Software)
-//!         .add_categories(vec![Category::Audio, Category::Movies]);
+//!     let request = SearchRequest::new("Ubuntu");
+//!     let results = magneto.search(request).await.unwrap();
 //!
-//!     // Or initialize the request like this for more customization.
-//!     let _request = SearchRequest {
-//!         query: "Debian",
-//!         query_imdb_id: false,
-//!         order_by: OrderBy::Seeders,
-//!         categories: vec![Category::Movies],
-//!         number_of_results: 10,
-//!     };
-//!
-//!     match magneto.search(request).await {
-//!         Ok(results) => {
-//!             for torrent in results {
-//!                 println!(
-//!                     "found: {} from {} with magnet link {} (seeders: {}, peers: {})",
-//!                     torrent.name,
-//!                     torrent.provider,
-//!                     torrent.magnet_link,
-//!                     torrent.seeders,
-//!                     torrent.peers,
-//!                 );
-//!             }
-//!         }
-//!         Err(e) => eprintln!("error during search: {:?}", e),
+//!     for torrent in results {
+//!         println!(
+//!             "found: {} from {} with magnet link {} (seeders: {}, peers: {})",
+//!             torrent.name,
+//!             torrent.provider,
+//!             torrent.magnet_link,
+//!             torrent.seeders,
+//!             torrent.peers,
+//!         );
 //!     }
 //! }
 //! ```
 //!
-//! ### Creating a `Magneto` instance from list of providers
+//! ### Specifying search providers
 //!
-//! ```rust
-//! use magneto::{
-//!     search_providers::{Knaben, PirateBay, SearchProvider, Yts},
-//!     Magneto,
-//! };
+//! ```no_run
+//! use magneto::{Magneto, Knaben, PirateBay, Yts};
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     // Create instance from list of providers
-//!     let providers: Vec<Box<dyn SearchProvider>> =
-//!         vec![Box::new(Knaben::new()), Box::new(PirateBay::new())];
-//!     let magneto = Magneto::with_providers(providers);
+//! // By default, all built-in providers are used (Knaben, PirateBay, Yts)
+//! let magneto = Magneto::new();
 //!
-//!     // Or add new providers like this
-//!     let magneto = Magneto::default()
-//!         .add_provider(Box::new(Knaben::new()))
-//!         .add_provider(Box::new(Yts::new()));
-//! }
+//! // You can specify which providers to use like this
+//! let magneto =
+//!     Magneto::with_providers(vec![Box::new(Knaben::new()), Box::new(PirateBay::new())]);
+//!
+//! // Or like this
+//! let magneto = Magneto::default()
+//!     .add_provider(Box::new(Knaben::new()))
+//!     .add_provider(Box::new(Yts::new()));
 //! ```
 //!
-//! ### Adding a custom provider
+//! ### Search request parameters
 //!
-//! ```rust
+//! ```no_run
+//! use magneto::{Category, SearchRequest, OrderBy};
+//!
+//! // You can add categories to filter your search results
+//! let request = SearchRequest::new("Ubuntu")
+//!     .add_category(Category::Software)
+//!     .add_categories(vec![Category::Audio, Category::Movies]);
+//!
+//! // Or initialize the request like this for more customization
+//! let request = SearchRequest {
+//!     query: "Debian",
+//!     order_by: OrderBy::Seeders,
+//!     categories: vec![Category::Software],
+//!     number_of_results: 10,
+//! };
+//! ```
+//!
+//! ### Add a custom provider
+//!
+//! ```no_run
 //! use magneto::{ClientError, Magneto, SearchProvider, SearchRequest, Torrent, Client, Request};
 //!
 //! struct CustomProvider;
 //!
 //! impl SearchProvider for CustomProvider {
-//!     fn parse_response(&self, response: &str) -> Result<Vec<Torrent>, ClientError> {
-//!         todo!("parse response data into Vec<Torrent>");
-//!     }
-//!
 //!     fn build_request(
 //!         &self,
 //!         client: &Client,
 //!         request: SearchRequest<'_>,
 //!     ) -> Result<Request, ClientError> {
-//!         todo!("convert SearchRequest to reqwest::Request");
+//!         // Convert SearchRequest parameters to a reqwest::Request
+//!         unimplemented!();
 //!     }
 //!
+//!     fn parse_response(&self, response: &str) -> Result<Vec<Torrent>, ClientError> {
+//!         // Parse the raw reponse into Vec<Torrent>
+//!         unimplemented!();
+//!     }
+//!
+//!
 //!     fn id(&self) -> String {
-//!         "custom_provider".to_string()
+//!         // Return a unique id, built-in providers use the provider url
+//!         unimplemented!();
 //!     }
 //! }
 //!
@@ -116,8 +127,10 @@ pub mod search_providers;
 
 use core::fmt;
 
-use log::debug;
+// Re-exports from reqwest
 pub use reqwest::{Client, Request};
+
+use log::debug;
 use serde::{Deserialize, Serialize};
 
 pub use errors::ClientError;
@@ -196,9 +209,6 @@ pub struct SearchRequest<'a> {
     /// The query string to search for.
     pub query: &'a str,
 
-    /// Whether to query by IMDb ID (not implemented yet).
-    pub query_imdb_id: bool,
-
     /// The order by which results are sorted.
     pub order_by: OrderBy,
 
@@ -213,7 +223,6 @@ impl<'a> SearchRequest<'a> {
     /// Creates a new `SearchRequest` with the specified query.
     ///
     /// Remaining fields get the following default values:
-    /// - `query_imdb_id`: `false`
     /// - `order_by`: `OrderBy::Seeders`
     /// - `categories`: An empty `Vec<Category>`
     /// - `number_of_results`: `50`
@@ -233,7 +242,6 @@ impl<'a> SearchRequest<'a> {
     pub fn new(query: &'a str) -> Self {
         Self {
             query,
-            query_imdb_id: false,
             order_by: OrderBy::Seeders,
             categories: vec![],
             number_of_results: 50,

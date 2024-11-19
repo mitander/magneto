@@ -2,6 +2,10 @@
 name = "magneto"
 version = "0.1.0"
 edition = "2021"
+description = "A torrent searching library"
+license = "MIT"
+keywords = ["torrent", "magnet", "tracker", "api", "library"]
+repository = "https://github.com/mitander/magneto"
 
 [features]
 default = ["reqwest/default-tls"]
