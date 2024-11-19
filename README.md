@@ -1,9 +1,10 @@
-<!-- cargo-sync-readme start -->
+# magneto
 
-# Magneto
 [<img alt="github" src="https://img.shields.io/badge/github-mitander/magneto-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/mitander/magneto)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/magneto.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/magneto)
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-magneto-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/magneto)
+
+<!-- cargo-sync-readme start -->
 
 `Magneto` is a library for searching torrents across multiple providers.
 It provides a unified interface for querying torrent metadata and integrating
@@ -26,7 +27,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-magneto = "0.1"
+magneto = "0.2"
 ```
 
 Then:

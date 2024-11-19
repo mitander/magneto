@@ -1,5 +1,3 @@
-//! # Magneto
-//!
 //! `Magneto` is a library for searching torrents across multiple providers.
 //! It provides a unified interface for querying torrent metadata and integrating
 //! custom providers.
@@ -21,7 +19,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! magneto = "0.1"
+//! magneto = "0.2"
 //! ```
 //!
 //! Then:
@@ -413,7 +411,7 @@ impl Magneto {
     /// Executes a search query across all active providers in sequence and aggregates the results.
     ///
     /// # Parameters
-    /// - `req`: The `SearchRequest` specifying the search parameters.
+    /// - `request`: The `SearchRequest` specifying the search parameters.
     ///
     /// # Returns
     /// - `Ok(Vec<Torrent>)`: A list of torrents returned by all active providers.
@@ -429,18 +427,18 @@ impl Magneto {
     /// // Search default providers for "Ubuntu" and returns a vector of torrent metadata
     /// let torrents = magneto.search(request);
     /// ```
-    pub async fn search(&self, req: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
+    pub async fn search(&self, request: SearchRequest<'_>) -> Result<Vec<Torrent>, ClientError> {
         let client = Client::new();
         let mut results = Vec::new();
 
         for provider in &self.active_providers {
-            match provider.send_request(&client, req.clone()).await {
+            match provider.send_request(&client, request.clone()).await {
                 Ok(mut torrents) => results.append(&mut torrents),
                 Err(e) => return Err(e),
             }
         }
 
-        results.sort_by(|a, b| match req.order_by {
+        results.sort_by(|a, b| match request.order_by {
             OrderBy::Seeders => b.seeders.cmp(&a.seeders),
             OrderBy::Peers => b.peers.cmp(&a.peers),
         });
