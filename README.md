@@ -27,6 +27,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
+tokio = { version = "1", features = ["full"] }
 magneto = "0.2.1"
 ```
 
