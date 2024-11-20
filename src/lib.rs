@@ -221,7 +221,7 @@ pub struct SearchRequest<'a> {
     pub categories: Vec<Category>,
 
     /// The number of results to retrieve.
-    pub number_of_results: u32,
+    pub number_of_results: usize,
 }
 
 impl<'a> SearchRequest<'a> {
@@ -449,6 +449,8 @@ impl Magneto {
             OrderBy::Seeders => b.seeders.cmp(&a.seeders),
             OrderBy::Peers => b.peers.cmp(&a.peers),
         });
+
+        results.truncate(request.number_of_results);
 
         Ok(results)
     }
