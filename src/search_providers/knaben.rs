@@ -23,7 +23,7 @@ impl Knaben {
     /// - `Knaben`: A new provider instance with the default API URL.
     pub fn new() -> Self {
         Self {
-            api_url: "https://api.knaben.eu/v1".to_string(),
+            api_url: "https://api.knaben.org/v1".to_string(),
         }
     }
 
