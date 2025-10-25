@@ -187,7 +187,7 @@ impl KnabenRequest {
         };
 
         Self {
-            search_type: "score".to_string(),
+            search_type: "100%".to_string(),
             search_field: "title".to_string(),
             query: request.query.to_string(),
             order_by: request.order_by.to_string(),
